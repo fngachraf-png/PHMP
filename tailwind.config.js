@@ -42,4 +42,9 @@ export default {
     },
   },
   plugins: [],
+  // Safelist dynamically-used classes so Tailwind includes them in build
+  safelist: [
+    { pattern: /^bg-(emerald|blue|purple|amber)-(100)/ },
+    { pattern: /^text-(emerald|blue|purple|amber)-(600)/ },
+  ]
 }
