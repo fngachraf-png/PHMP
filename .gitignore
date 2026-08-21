@@ -28,3 +28,34 @@ Thumbs.db
 # Project specific
 moroccan_drugs.csv  # Raw data file, use processed version
 *.zip
+
+# Env / secrets (keep .env.example)
+.envrc
+!.env.example
+
+# Python caches
+__pycache__/
+.venv/
+venv/
+
+# Framework build output
+.next/
+.output/
+out/
+
+# Caches
+.cache/
+
+# Large binaries (>50MB)
+*.mp4
+*.mov
+*.tar
+*.tar.gz
+*.bin
+*.pth
+*.onnx
+*.gguf
+*.wav
+*.mp3
+videos/
+*.pdf
