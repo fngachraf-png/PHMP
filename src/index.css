@@ -5,15 +5,27 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    /* ملء كامل لشاشة الهاتف في تطبيق الأندرويد (الوضع الغامر) */
+    height: 100%;
   }
 
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
     font-family: 'Inter', 'Cairo', sans-serif;
+    min-height: 100dvh;
   }
 
   html[dir="rtl"] body {
     font-family: 'Cairo', 'Inter', sans-serif;
+  }
+
+  /* مناطق الأمان لأجهزة الحواف المنحنية وتطبيق أندرويد بملء الشاشة */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   * {
@@ -140,5 +152,56 @@
 
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+/* ===================================================================
+   أنماط طباعة الفواتير — تُطبع منطقة الفاتورة فقط (80mm حراري/عادي)
+   يطبع: اسم الصيدلية + اسم الدواء + سعره + طريقة الدفع
+   =================================================================== */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  /* إخفاء كل شيء ما عدا منطقة الطباعة */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-area, .print-area * {
+    visibility: visible !important;
+  }
+
+  .print-area {
+    position: fixed !important;
+    top: 0 !important;
+    inset-inline-start: 0 !important;
+    width: 72mm !important;
+    max-width: 100% !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-area table {
+    page-break-inside: auto;
+  }
+
+  .print-area tr {
+    page-break-inside: avoid;
   }
 }

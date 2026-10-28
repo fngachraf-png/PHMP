@@ -10,7 +10,7 @@ import {
 } from 'recharts'
 
 const Reports = () => {
-  const { t, isRTL, salesData, productsData, categories, prescriptionsData, customersData } = useApp()
+  const { t, isRTL, salesData, productsData, categories, prescriptionsData, customersData , pickName, language} = useApp()
   const [activeReport, setActiveReport] = useState('sales')
   const [period, setPeriod] = useState('thisMonth')
 
@@ -58,7 +58,7 @@ const Reports = () => {
   })
   const categoryData = Object.entries(categoryValue).map(([id, value]) => {
     const cat = categories.find(c => c.id === id)
-    return { name: isRTL ? cat?.name : cat?.nameEn, value: Math.round(value) }
+    return { name: pickName(cat), value: Math.round(value) }
   })
 
   // Profit calculation
@@ -91,7 +91,7 @@ const Reports = () => {
             <BarChart3 className="w-7 h-7 text-primary-600" />
             {t('reports')}
           </h1>
-          <p className="text-sm text-gray-600 mt-1">{isRTL ? 'تحليلات وإحصائيات' : 'Analytics & Statistics'}</p>
+          <p className="text-sm text-gray-600 mt-1">{language === 'ar' ? 'تحليلات وإحصائيات' : language === 'fr' ? 'Analyses et statistiques' : 'Analytics & Statistics'}</p>
         </div>
         <div className="flex gap-2">
           <select value={period} onChange={(e) => setPeriod(e.target.value)} className="input">
@@ -134,10 +134,10 @@ const Reports = () => {
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: isRTL ? 'إجمالي المبيعات' : 'Total Sales', value: `${totalRevenue.toLocaleString()} ${t('currency')}`, color: 'emerald' },
-              { label: isRTL ? 'عدد الطلبات' : 'Orders', value: salesData.length, color: 'blue' },
-              { label: isRTL ? 'متوسط الطلب' : 'Avg Order', value: `${(totalRevenue / salesData.length).toFixed(0)} ${t('currency')}`, color: 'purple' },
-              { label: isRTL ? 'العملاء' : 'Customers', value: customersData.length, color: 'amber' },
+              { label: language === 'ar' ? 'إجمالي المبيعات' : language === 'fr' ? 'Ventes totales' : 'Total Sales', value: `${totalRevenue.toLocaleString()} ${t('currency')}`, color: 'emerald' },
+              { label: language === 'ar' ? 'عدد الطلبات' : language === 'fr' ? 'Commandes' : 'Orders', value: salesData.length, color: 'blue' },
+              { label: language === 'ar' ? 'متوسط الطلب' : language === 'fr' ? 'Panier moyen' : 'Avg Order', value: `${(totalRevenue / salesData.length).toFixed(0)} ${t('currency')}`, color: 'purple' },
+              { label: language === 'ar' ? 'العملاء' : language === 'fr' ? 'Clients' : 'Customers', value: customersData.length, color: 'amber' },
             ].map((kpi, i) => (
               <div key={i} className="card p-5">
                 <p className="text-sm text-gray-500">{kpi.label}</p>

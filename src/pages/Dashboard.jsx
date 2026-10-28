@@ -8,7 +8,7 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { Link } from 'react-router-dom'
 
 const Dashboard = () => {
-  const { t, isRTL, productsData, salesData, customersData, prescriptionsData, currentPharmacy } = useApp()
+  const { t, isRTL, productsData, salesData, customersData, prescriptionsData, currentPharmacy , pickName, language} = useApp()
 
   // Calculate KPIs
   const today = new Date().toISOString().split('T')[0]
@@ -83,7 +83,7 @@ const Dashboard = () => {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5)
     .map((p, i) => ({
-      name: isRTL ? p.name.split(' ')[0] : p.name,
+      name: pickName(p).split(' ')[0],
       revenue: p.revenue,
       quantity: p.quantity,
       rank: i + 1
@@ -105,13 +105,13 @@ const Dashboard = () => {
 
   // Weekly sales chart
   const weeklyData = [
-    { day: isRTL ? 'الإثنين' : 'Mon', sales: 8500 },
-    { day: isRTL ? 'الثلاثاء' : 'Tue', sales: 9200 },
-    { day: isRTL ? 'الأربعاء' : 'Wed', sales: 7800 },
-    { day: isRTL ? 'الخميس' : 'Thu', sales: 10100 },
-    { day: isRTL ? 'الجمعة' : 'Fri', sales: 11500 },
-    { day: isRTL ? 'السبت' : 'Sat', sales: 12300 },
-    { day: isRTL ? 'الأحد' : 'Sun', sales: 9800 },
+    { day: language === 'ar' ? 'الإثنين' : language === 'fr' ? 'Lun' : 'Mon', sales: 8500 },
+    { day: language === 'ar' ? 'الثلاثاء' : language === 'fr' ? 'Mar' : 'Tue', sales: 9200 },
+    { day: language === 'ar' ? 'الأربعاء' : language === 'fr' ? 'Mer' : 'Wed', sales: 7800 },
+    { day: language === 'ar' ? 'الخميس' : language === 'fr' ? 'Jeu' : 'Thu', sales: 10100 },
+    { day: language === 'ar' ? 'الجمعة' : language === 'fr' ? 'Ven' : 'Fri', sales: 11500 },
+    { day: language === 'ar' ? 'السبت' : language === 'fr' ? 'Sam' : 'Sat', sales: 12300 },
+    { day: language === 'ar' ? 'الأحد' : language === 'fr' ? 'Dim' : 'Sun', sales: 9800 },
   ]
 
   return (
@@ -121,7 +121,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">{t('dashboard')}</h1>
           <p className="text-sm text-gray-600 mt-1">
-            {isRTL ? currentPharmacy?.name.split(' /')[0] : currentPharmacy?.nameEn} • {new Date().toLocaleDateString(isRTL ? 'ar-MA' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {pickName(currentPharmacy)} • {new Date().toLocaleDateString(language === 'ar' ? 'ar-MA' : language === 'fr' ? 'fr-FR' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -194,8 +194,8 @@ const Dashboard = () => {
 
         {/* Category distribution */}
         <div className="card p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-1">{isRTL ? 'توزيع الفئات' : 'Categories'}</h3>
-          <p className="text-sm text-gray-500 mb-4">{isRTL ? 'حسب قيمة المخزون' : 'By inventory value'}</p>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">{language === 'ar' ? 'توزيع الفئات' : language === 'fr' ? 'Répartition par catégorie' : 'Categories'}</h3>
+          <p className="text-sm text-gray-500 mb-4">{language === 'ar' ? 'حسب قيمة المخزون' : language === 'fr' ? 'Par valeur de stock' : 'By inventory value'}</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
@@ -246,7 +246,7 @@ const Dashboard = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                  <p className="text-xs text-gray-500">{product.quantity} {isRTL ? 'وحدة' : 'units'}</p>
+                  <p className="text-xs text-gray-500">{product.quantity} {language === 'ar' ? 'وحدة' : language === 'fr' ? 'unités' : 'units'}</p>
                 </div>
                 <p className="text-sm font-bold text-primary-600">{product.revenue.toFixed(0)}</p>
               </div>
@@ -267,9 +267,9 @@ const Dashboard = () => {
               <div key={`low-${product.id}`} className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
                 <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-amber-900">{isRTL ? product.name.split(' ')[0] : product.nameEn.split(' ')[0]}</p>
+                  <p className="text-sm font-semibold text-amber-900">{pickName(product).split(' ')[0]}</p>
                   <p className="text-xs text-amber-700 mt-0.5">
-                    {isRTL ? `مخزون منخفض: ${product.stock} (الحد الأدنى ${product.minStock})` : `Low stock: ${product.stock} (min ${product.minStock})`}
+                    {language === 'ar' ? `مخزون منخفض: ${product.stock} (الحد الأدنى ${product.minStock})` : language === 'fr' ? `Stock faible : ${product.stock} (min ${product.minStock})` : `Low stock: ${product.stock} (min ${product.minStock})`}
                   </p>
                 </div>
               </div>
@@ -280,9 +280,9 @@ const Dashboard = () => {
                 <div key={`exp-${product.id}`} className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
                   <Clock className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-red-900">{isRTL ? product.name.split(' ')[0] : product.nameEn.split(' ')[0]}</p>
+                    <p className="text-sm font-semibold text-red-900">{pickName(product).split(' ')[0]}</p>
                     <p className="text-xs text-red-700 mt-0.5">
-                      {isRTL ? `ينتهي خلال ${days} يوم` : `Expires in ${days} days`}
+                      {language === 'ar' ? `ينتهي خلال ${days} يوم` : language === 'fr' ? `Expire dans ${days} jours` : `Expires in ${days} days`}
                     </p>
                   </div>
                 </div>

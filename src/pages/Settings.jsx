@@ -1,14 +1,24 @@
 import { useState } from 'react'
 import { useApp } from '../contexts/AppContext'
+import { ROLE_INFO } from '../config/permissions'
+import { setApiUrl, getApiUrl } from '../lib/api'
 import {
   Settings as SettingsIcon, Globe, Bell, Shield, Database,
   Building2, Users, Palette, Save, Mail, Phone, MapPin, FileText,
-  Sun, Moon, Trash2, Download, Upload
+  Sun, Moon, Trash2, Download, Upload, Plus, Pencil, Wifi, RefreshCw, Crown
 } from 'lucide-react'
 
 const Settings = () => {
-  const { t, isRTL, language, setLanguage, theme, setTheme, currentPharmacy, currentUser } = useApp()
+  const {
+    t, isRTL, language, setLanguage, theme, setTheme, currentPharmacy, currentUser,
+    visibleUsers, addUser, updateUser, deleteUser, hasPermission, pharmaciesData,
+    serverStatus, syncToServer,
+  pickName} = useApp()
   const [activeTab, setActiveTab] = useState('general')
+  const [showUserModal, setShowUserModal] = useState(null)
+  const [userForm, setUserForm] = useState({ name: '', username: '', password: '', role: 'pharmacist', pharmacyId: 'ph1', avatar: '👤' })
+  const [apiUrlInput, setApiUrlInput] = useState(getApiUrl())
+  const [syncing, setSyncing] = useState(false)
   const [notifications, setNotifications] = useState({
     lowStock: true,
     expiry: true,
@@ -20,7 +30,8 @@ const Settings = () => {
     { id: 'general', label: t('generalSettings'), icon: SettingsIcon },
     { id: 'pharmacy', label: t('pharmacyInfo'), icon: Building2 },
     { id: 'notifications', label: t('notifications'), icon: Bell },
-    { id: 'users', label: t('manageUsers'), icon: Users },
+    ...(hasPermission('users.view') ? [{ id: 'users', label: t('manageUsers'), icon: Users }] : []),
+    { id: 'server', label: t('localServer'), icon: Wifi },
     { id: 'data', label: t('backup'), icon: Database },
   ]
 
@@ -31,7 +42,7 @@ const Settings = () => {
           <SettingsIcon className="w-7 h-7 text-primary-600" />
           {t('settings')}
         </h1>
-        <p className="text-sm text-gray-600 mt-1">{isRTL ? 'إعدادات النظام' : 'System settings'}</p>
+        <p className="text-sm text-gray-600 mt-1">{language === 'ar' ? 'إعدادات النظام' : language === 'fr' ? 'Paramètres du système' : 'System settings'}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -63,11 +74,12 @@ const Settings = () => {
             <div className="card p-6 space-y-6">
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-1">{t('language')}</h3>
-                <p className="text-sm text-gray-500 mb-4">{isRTL ? 'اختر لغة الواجهة' : 'Choose interface language'}</p>
-                <div className="grid grid-cols-2 gap-3">
+                <p className="text-sm text-gray-500 mb-4">{t('chooseLanguage')}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
-                    { id: 'ar', label: 'العربية', flag: '🇲🇦' },
-                    { id: 'en', label: 'English', flag: '🇬🇧' },
+                    { id: 'ar', label: 'العربية', sub: 'RTL', flag: '🇲🇦' },
+                    { id: 'fr', label: 'Français', sub: 'LTR', flag: '🇫🇷' },
+                    { id: 'en', label: 'English', sub: 'LTR', flag: '🇬🇧' },
                   ].map(lang => (
                     <button
                       key={lang.id}
@@ -81,7 +93,7 @@ const Settings = () => {
                       <span className="text-3xl">{lang.flag}</span>
                       <div className="text-start">
                         <p className="font-semibold text-gray-900">{lang.label}</p>
-                        <p className="text-xs text-gray-500">{lang.id === 'ar' ? 'RTL' : 'LTR'}</p>
+                        <p className="text-xs text-gray-500">{lang.sub}</p>
                       </div>
                     </button>
                   ))}
@@ -90,11 +102,11 @@ const Settings = () => {
 
               <div className="pt-6 border-t border-gray-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-1">{t('theme')}</h3>
-                <p className="text-sm text-gray-500 mb-4">{isRTL ? 'اختر مظهر التطبيق' : 'Choose app appearance'}</p>
+                <p className="text-sm text-gray-500 mb-4">{language === 'ar' ? 'اختر مظهر التطبيق' : language === 'fr' ? 'Choisir l\'apparence' : 'Choose app appearance'}</p>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: 'light', label: isRTL ? 'فاتح' : 'Light', icon: Sun, color: 'amber' },
-                    { id: 'dark', label: isRTL ? 'داكن' : 'Dark', icon: Moon, color: 'indigo' },
+                    { id: 'light', label: language === 'ar' ? 'فاتح' : language === 'fr' ? 'Clair' : 'Light', icon: Sun, color: 'amber' },
+                    { id: 'dark', label: language === 'ar' ? 'داكن' : language === 'fr' ? 'Sombre' : 'Dark', icon: Moon, color: 'indigo' },
                   ].map(t => {
                     const Icon = t.icon
                     const active = theme === t.id
@@ -142,11 +154,11 @@ const Settings = () => {
                   <input type="text" defaultValue={currentPharmacy.address} className="input" />
                 </div>
                 <div>
-                  <label className="label flex items-center gap-1"><FileText className="w-3 h-3" /> {isRTL ? 'رقم الترخيص' : 'License'}</label>
+                  <label className="label flex items-center gap-1"><FileText className="w-3 h-3" /> {language === 'ar' ? 'رقم الترخيص' : language === 'fr' ? 'Licence' : 'License'}</label>
                   <input type="text" defaultValue={currentPharmacy.license} className="input" />
                 </div>
                 <div>
-                  <label className="label">{isRTL ? 'الرقم الضريبي' : 'Tax ID'}</label>
+                  <label className="label">{language === 'ar' ? 'الرقم الضريبي' : language === 'fr' ? 'ID fiscal' : 'Tax ID'}</label>
                   <input type="text" placeholder="TVA-XXX" className="input" />
                 </div>
               </div>
@@ -163,13 +175,13 @@ const Settings = () => {
           {activeTab === 'notifications' && (
             <div className="card p-6 space-y-3">
               <h3 className="text-lg font-bold mb-1">{t('notifications')}</h3>
-              <p className="text-sm text-gray-500 mb-4">{isRTL ? 'إعدادات التنبيهات' : 'Notification settings'}</p>
+              <p className="text-sm text-gray-500 mb-4">{language === 'ar' ? 'إعدادات التنبيهات' : language === 'fr' ? 'Paramètres des notifications' : 'Notification settings'}</p>
 
               {[
-                { key: 'lowStock', label: t('lowStockAlerts'), desc: isRTL ? 'تنبيه عند انخفاض المخزون' : 'Alert when stock is low' },
-                { key: 'expiry', label: t('expiryAlerts'), desc: isRTL ? 'تنبيه قبل انتهاء الصلاحية' : 'Alert before products expire' },
-                { key: 'sales', label: isRTL ? 'تنبيهات المبيعات' : 'Sales Alerts', desc: isRTL ? 'تنبيه لكل عملية بيع' : 'Alert for each sale' },
-                { key: 'prescriptions', label: isRTL ? 'تنبيهات الوصفات' : 'Prescription Alerts', desc: isRTL ? 'تنبيه للوصفات الجديدة' : 'Alert for new prescriptions' },
+                { key: 'lowStock', label: t('lowStockAlerts'), desc: language === 'ar' ? 'تنبيه عند انخفاض المخزون' : language === 'fr' ? 'Alerte quand le stock est faible' : 'Alert when stock is low' },
+                { key: 'expiry', label: t('expiryAlerts'), desc: language === 'ar' ? 'تنبيه قبل انتهاء الصلاحية' : language === 'fr' ? 'Alerte avant péremption' : 'Alert before products expire' },
+                { key: 'sales', label: language === 'ar' ? 'تنبيهات المبيعات' : language === 'fr' ? 'Alertes ventes' : 'Sales Alerts', desc: language === 'ar' ? 'تنبيه لكل عملية بيع' : language === 'fr' ? 'Alerte à chaque vente' : 'Alert for each sale' },
+                { key: 'prescriptions', label: language === 'ar' ? 'تنبيهات الوصفات' : language === 'fr' ? 'Alertes ordonnances' : 'Prescription Alerts', desc: language === 'ar' ? 'تنبيه للوصفات الجديدة' : language === 'fr' ? 'Alerte pour nouvelles ordonnances' : 'Alert for new prescriptions' },
               ].map(item => (
                 <div key={item.key} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
                   <div>
@@ -193,31 +205,163 @@ const Settings = () => {
             </div>
           )}
 
-          {activeTab === 'users' && (
+          {activeTab === 'users' && hasPermission('users.view') && (
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold">{t('manageUsers')}</h3>
-                <button className="btn-primary"><Users className="w-4 h-4" />{isRTL ? 'إضافة مستخدم' : 'Add User'}</button>
+                {hasPermission('users.manage') && (
+                  <button
+                    onClick={() => { setUserForm({ name: '', username: '', password: '', role: 'pharmacist', pharmacyId: currentUser?.pharmacyId || 'ph1', avatar: '👤' }); setShowUserModal('new') }}
+                    className="btn-primary"
+                  >
+                    <Plus className="w-4 h-4" />{t('addUser')}
+                  </button>
+                )}
               </div>
               <div className="space-y-2">
-                {[
-                  { name: 'محمد الإدريسي', role: 'admin', avatar: '👨‍⚕️', active: true },
-                  { name: 'فاطمة الزهراء', role: 'pharmacist', avatar: '👩‍⚕️', active: true },
-                  { name: 'يوسف بن علي', role: 'cashier', avatar: '🧑‍💼', active: true },
-                ].map((user, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-2xl">
-                      {user.avatar}
+                {visibleUsers.map(u => {
+                  const info = ROLE_INFO[u.role] || {}
+                  const ph = pharmaciesData.find(p => p.id === u.pharmacyId)
+                  return (
+                    <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${u.role === 'super_admin' ? 'bg-gradient-to-br from-violet-400 to-violet-600' : 'bg-gradient-to-br from-primary-400 to-primary-600'}`}>
+                        {u.avatar}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{u.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {info.badge} {language === 'ar' ? info.ar : language === 'fr' ? (info.fr || info.en) : info.en}
+                          {u.role !== 'super_admin' && ph ? ` • ${pickName(ph)}` : u.role === 'super_admin' ? ` • ${t('allPharmacies')}` : ''}
+                        </p>
+                      </div>
+                      <span className={`badge ${u.active !== false ? 'badge-success' : 'badge-gray'}`}>
+                        {u.active !== false ? (language === 'ar' ? 'نشط' : language === 'fr' ? 'Actif' : 'Active') : (language === 'ar' ? 'موقوف' : language === 'fr' ? 'Suspendu' : 'Inactive')}
+                      </span>
+                      {hasPermission('users.manage') && u.role !== 'super_admin' && u.id !== currentUser?.id && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => { setUserForm({ name: u.name, username: u.username, password: '', role: u.role, pharmacyId: u.pharmacyId, avatar: u.avatar }); setShowUserModal(u) }}
+                            className="p-1.5 rounded-lg hover:bg-white text-gray-600"
+                            title={t('edit')}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => { if (window.confirm(language === 'ar' ? `حذف ${u.name}؟` : language === 'fr' ? `Supprimer ${u.name} ?` : `Delete ${u.name}?`)) deleteUser(u.id) }}
+                            className="p-1.5 rounded-lg hover:bg-red-100 text-red-600"
+                            title={t('delete')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                      {u.role === 'super_admin' && <Crown className="w-4 h-4 text-violet-500" />}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900">{user.name}</p>
-                      <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                  )
+                })}
+              </div>
+              {showUserModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowUserModal(null)}>
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4" onClick={e => e.stopPropagation()}>
+                    <h3 className="font-bold text-gray-900">{showUserModal === 'new' ? t('addUser') : `${t('edit')} - ${showUserModal.name}`}</h3>
+                    <div>
+                      <label className="label">{t('name')} *</label>
+                      <input className="input" value={userForm.name} onChange={e => setUserForm({ ...userForm, name: e.target.value })} />
                     </div>
-                    <span className={`badge ${user.active ? 'badge-success' : 'badge-gray'}`}>
-                      {user.active ? (isRTL ? 'نشط' : 'Active') : (isRTL ? 'موقوف' : 'Inactive')}
-                    </span>
+                    <div>
+                      <label className="label">{t('username')} *</label>
+                      <input className="input" dir="ltr" value={userForm.username} disabled={showUserModal !== 'new'} onChange={e => setUserForm({ ...userForm, username: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="label">{t('password')} {showUserModal !== 'new' && `(${language === 'ar' ? 'فارغ = بدون تغيير' : language === 'fr' ? 'vide = conserver' : 'empty = keep'})`}</label>
+                      <input type="password" className="input" dir="ltr" value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label">{t('role')}</label>
+                        <select className="input" value={userForm.role} onChange={e => setUserForm({ ...userForm, role: e.target.value })}>
+                          {Object.entries(ROLE_INFO).filter(([k]) => k !== 'super_admin').map(([k, v]) => (
+                            <option key={k} value={k}>{v.badge} {language === 'ar' ? v.ar : language === 'fr' ? (v.fr || v.en) : v.en}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="label">{t('selectPharmacy')}</label>
+                        <select className="input" value={userForm.pharmacyId} onChange={e => setUserForm({ ...userForm, pharmacyId: e.target.value })}>
+                          {pharmaciesData.map(ph => (
+                            <option key={ph.id} value={ph.id}>{pickName(ph)}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        className="btn-primary flex-1"
+                        onClick={() => {
+                          if (showUserModal === 'new') {
+                            if (userForm.name && userForm.username && userForm.password) addUser(userForm)
+                          } else {
+                            const updates = { name: userForm.name, role: userForm.role, pharmacyId: userForm.pharmacyId }
+                            if (userForm.password) updates.password = userForm.password
+                            updateUser(showUserModal.id, updates)
+                          }
+                          setShowUserModal(null)
+                        }}
+                      >
+                        <Save className="w-4 h-4" />{t('save')}
+                      </button>
+                      <button className="btn-secondary flex-1" onClick={() => setShowUserModal(null)}>{t('cancel')}</button>
+                    </div>
                   </div>
-                ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'server' && (
+            <div className="card p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold">{t('localServer')}</h3>
+                <span className={`badge ${serverStatus.online ? 'badge-success' : 'badge-gray'}`}>
+                  {serverStatus.online ? t('serverOnline') : t('serverOffline')}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500">
+                {isRTL
+                  ? 'اربط المنصة بقاعدة البيانات المحلية SQLite عبر النفق الدائم لتخزين مركزي ودائم للبيانات.'
+                  : 'Connect the platform to the local SQLite database via the permanent tunnel for centralized, persistent data storage.'}
+              </p>
+              <div>
+                <label className="label">{language === 'ar' ? 'عنوان الخادم (النفق)' : language === 'fr' ? 'URL du serveur (tunnel)' : 'Server URL (tunnel)'}</label>
+                <div className="flex gap-2">
+                  <input className="input" dir="ltr" value={apiUrlInput} onChange={e => setApiUrlInput(e.target.value)} placeholder="https://phmp-api.trycloudflare.com" />
+                  <button className="btn-secondary" onClick={() => { setApiUrl(apiUrlInput); window.location.reload() }}>
+                    <Save className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{t('lastSync')}</p>
+                  <p className="text-xs text-gray-500" dir="ltr">
+                    {serverStatus.lastSync ? new Date(serverStatus.lastSync).toLocaleString() : '—'}
+                  </p>
+                </div>
+                <button
+                  className="btn-primary"
+                  disabled={syncing || !serverStatus.online}
+                  onClick={async () => { setSyncing(true); await syncToServer(); setSyncing(false) }}
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                  {t('syncNow')}
+                </button>
+              </div>
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                <p className="text-xs text-amber-800">
+                  {isRTL
+                    ? 'ملاحظة: في غياب الخادم تعمل المنصة محلياً بكل الوظائف عبر التخزين المحلي للمتصفح. راجع دليل البيئة المحلية LOCAL_ENVIRONMENT.md لتنصيب الخادم والنفق.'
+                    : 'Note: without the server, the platform works fully locally via browser storage. See LOCAL_ENVIRONMENT.md to install the server and tunnel.'}
+                </p>
               </div>
             </div>
           )}
@@ -225,25 +369,25 @@ const Settings = () => {
           {activeTab === 'data' && (
             <div className="card p-6 space-y-4">
               <h3 className="text-lg font-bold mb-1">{t('backup')}</h3>
-              <p className="text-sm text-gray-500 mb-4">{isRTL ? 'إدارة النسخ الاحتياطية' : 'Manage backups'}</p>
+              <p className="text-sm text-gray-500 mb-4">{language === 'ar' ? 'إدارة النسخ الاحتياطية' : language === 'fr' ? 'Gestion des sauvegardes' : 'Manage backups'}</p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button className="p-4 rounded-xl border-2 border-dashed border-gray-300 hover:border-primary-500 hover:bg-primary-50 transition-all text-start">
                   <Download className="w-6 h-6 text-primary-600 mb-2" />
-                  <p className="font-semibold text-gray-900">{isRTL ? 'تصدير البيانات' : 'Export Data'}</p>
-                  <p className="text-xs text-gray-500 mt-1">{isRTL ? 'احفظ نسخة احتياطية' : 'Save backup'}</p>
+                  <p className="font-semibold text-gray-900">{language === 'ar' ? 'تصدير البيانات' : language === 'fr' ? 'Exporter les données' : 'Export Data'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{language === 'ar' ? 'احفظ نسخة احتياطية' : language === 'fr' ? 'Enregistrer une sauvegarde' : 'Save backup'}</p>
                 </button>
                 <button className="p-4 rounded-xl border-2 border-dashed border-gray-300 hover:border-primary-500 hover:bg-primary-50 transition-all text-start">
                   <Upload className="w-6 h-6 text-primary-600 mb-2" />
-                  <p className="font-semibold text-gray-900">{isRTL ? 'استيراد البيانات' : 'Import Data'}</p>
-                  <p className="text-xs text-gray-500 mt-1">{isRTL ? 'استرجع نسخة احتياطية' : 'Restore backup'}</p>
+                  <p className="font-semibold text-gray-900">{language === 'ar' ? 'استيراد البيانات' : language === 'fr' ? 'Importer les données' : 'Import Data'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{language === 'ar' ? 'استرجع نسخة احتياطية' : language === 'fr' ? 'Restaurer une sauvegarde' : 'Restore backup'}</p>
                 </button>
               </div>
 
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mt-4">
-                <p className="text-sm font-semibold text-amber-900">💡 {isRTL ? 'نصيحة' : 'Tip'}</p>
+                <p className="text-sm font-semibold text-amber-900">💡 {language === 'ar' ? 'نصيحة' : language === 'fr' ? 'Conseil' : 'Tip'}</p>
                 <p className="text-xs text-amber-800 mt-1">
-                  {isRTL ? 'قم بإجراء نسخ احتياطي بشكل منتظم للحفاظ على بياناتك آمنة' : 'Perform regular backups to keep your data safe'}
+                  {language === 'ar' ? 'قم بإجراء نسخ احتياطي بشكل منتظم للحفاظ على بياناتك آمنة' : language === 'fr' ? 'Effectuez des sauvegardes régulières pour protéger vos données' : 'Perform regular backups to keep your data safe'}
                 </p>
               </div>
             </div>

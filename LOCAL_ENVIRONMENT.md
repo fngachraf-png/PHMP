@@ -1,0 +1,149 @@
+# 📘 دليل البيئة المحلية — PHMP PharmaCare Pro
+
+> **هذا الملف موجَّه إلى المساعد الآلي المسؤول عن البيئة المحلية** الذي يشرف على بناء وإدارة قاعدة البيانات المحلية SQLite والنفق الدائم.
+> مهمته: تنصيب الخادم، تشغيله، ضمان ديمومة النفق، المزامنة، والنسخ الاحتياطي.
+
+## 🏗️ البنية العامة للمنصة
+
+```
+┌─────────────────────────┐     ┌──────────────────────────┐
+│  الواجهة (Frontend)     │     │  الخادم المحلي (Backend) │
+│  Cloudflare Pages       │     │  Express + SQLite        │
+│  https://phmp.pages.dev │────▶│  http://localhost:3001   │
+│  (أيضاً Vercel قائم)    │HTTPS│            ▲             │
+└─────────────────────────┘     │   نفق Cloudflare دائم    │
+                                │   https://phmp-api.دومينك│
+                                └──────────────────────────┘
+```
+
+- **الواجهة**: React + Vite، منشورة على Cloudflare Pages (رئيسي) وVercel (قائم)، وتعمل بنمطين:
+  - **النمط المحلي المستقل**: كل البيانات في متصفح المستخدم (localStorage) — يعمل بدون خادم بكل الوظائف.
+  - **النمط المتصل**: مزامنة مع قاعدة SQLite المحلية عبر الخادم والنفق.
+- **الخادم المحلي**: مجلد `server/` — Express + better-sqlite3 + JWT + bcrypt.
+- **قاعدة البيانات**: ملف SQLite واحد `server/data/phmp.db` (نمط WAL).
+- **النفق الدائم**: cloudflared named tunnel يربط عنوان HTTPS ثابت بالخادم المحلي.
+
+## 📋 المهام الموكلة للمساعد المحلي (Checklist)
+
+### 1) التنصيب الأولي (مرة واحدة)
+```bash
+cd server
+npm install          # تثبيت الاعتماديات (better-sqlite3 يتطلب أدوات بناء C++)
+npm run seed         # تهيئة قاعدة البيانات + المستخدمين الافتراضيين
+```
+
+### 2) تشغيل الخادم
+```bash
+cd server
+npm start            # المنفذ 3001
+# أو كخدمة دائمة (Linux):
+nohup npm start > server.log 2>&1 &
+# أو systemd: انسخ phmp-server.service (بالأسفل) إلى /etc/systemd/system/
+```
+
+فحص الصحة: `curl http://localhost:3001/api/health` → يجب أن يعيد `{"ok":true,...}`
+
+### 3) النفق الدائم (مرة واحدة للإعداد)
+```bash
+cd server/tunnel
+bash setup-tunnel.sh    # يتطلب نطاقاً مسجلاً في نفس حساب Cloudflare
+                        # (الحساب المعتمد للمنصة: Balbolghol@gmail.com)
+bash start-tunnel.sh    # تشغيل النفق بعد الإعداد
+```
+
+- إن لم يتوفر نطاق مسجل: `start-tunnel.sh` يشتغل بنفق سريع مؤقت (trycloudflare.com) — **العنوان يتغير مع كل إعادة تشغيل**، فيجب عندئذ تحديث العنوان في المنصة: *الإعدادات ← الخادم المحلي ← عنوان الخادم*.
+- النفق الدائم (الموصى به) يعطي عنواناً ثابتاً لا يتغير أبداً.
+
+### 4) الربط مع الواجهة
+في المنصة: **الإعدادات ← الخادم المحلي**:
+1. أدخل عنوان الخادم (عنوان النفق الدائم)
+2. اضغط حفظ — يفحص النظام الخادم تلقائياً (مؤشر أخضر = متصل)
+3. اضغط **مزامنة الآن** لدفع كل بيانات localStorage إلى SQLite
+
+### 5) المهام الدورية
+| المهمة | التكرار | الأمر / المسار |
+|---|---|---|
+| فحص صحة الخادم | كل 5 دقائق | `curl localhost:3001/api/health` |
+| نسخة احتياطية | يومياً | `curl localhost:3001/api/backup` → `server/data/phmp-backup-YYYY-MM-DD.json` |
+| مزامنة الواجهة | عند كل إشعار من المستخدم | زر "مزامنة الآن" في المنصة |
+| فحص النفق | كل ساعة | التأكد أن عنوان النفق يعيد `/api/health` |
+| تحديث بيانات الأدوية | عند صدور لائحة AMMPS جديدة | تحديث `src/data/moroccanDrugs.js` من المستودع |
+
+## 👤 حسابات الدخول الافتراضية (بعد seed)
+
+| الدور | المستخدم | كلمة المرور | الصلاحيات |
+|---|---|---|---|
+| 👑 مالك المنصة (سوبر أدمين) | `superadmin` | `super123` | كل الصلاحيات + كل الصيدليات + سجل التدقيق |
+| 🛡️ مدير الصيدلية | `admin` | `admin` | صيدليته: كل شيء عدا إدارة المنصة |
+| 📊 محاسب | `accountant` | `account` | التقارير المالية + المشتريات + الموردون (قراءة المخزون) |
+| ⚕️ صيدلاني | `pharmacist` | `pharma` | نقطة البيع + الوصفات + إدارة المخزون |
+| 🧾 كاشير | `cashier` | `cashier` | نقطة البيع + العملاء فقط |
+
+> ⚠️ **أمان**: غيّر كلمات المرور فوراً في الإنتاج عبر `PATCH /api/users/:id` أو أعد التهيئة.
+
+## 🗄️ مخطط قاعدة البيانات (SQLite)
+
+الجداول: `pharmacies`, `users`, `products`, `customers`, `suppliers`, `prescriptions`, `sales`, `audit_log`, `meta`
+
+- الملف: `server/data/phmp.db`
+- الوضع: WAL (يعزز الأداء ويسمح بالقراءة المتزامنة)
+- النسخ الاحتياطي: نسخ الملف مباشرة بعد إيقاف الخدمة، أو استعمال `/api/backup` أثناء التشغيل.
+
+## 🔌 واجهات API المتاحة
+
+| الطريقة | المسار | الوصف | الصلاحية |
+|---|---|---|---|
+| GET | `/api/health` | فحص الصحة | عام |
+| POST | `/api/auth/login` | دخول (JWT + bcrypt) | عام |
+| GET | `/api/users` | قائمة المستخدمين | أدمن+ |
+| POST/PATCH/DELETE | `/api/users[/:id]` | إدارة المستخدمين | أدمن+ |
+| GET | `/api/pharmacies` | قائمة الصيدليات | عام |
+| POST | `/api/pharmacies` | إضافة صيدلية | سوبر أدمين |
+| POST | `/api/sync` | مزامنة كاملة من الواجهة | عام (نفق خاص) |
+| GET | `/api/data` | استرجاع كل البيانات | عام (نفق خاص) |
+| GET | `/api/audit` | سجل التدقيق | سوبر أدمين |
+| GET | `/api/backup` | نسخة احتياطية JSON | عام (نفق خاص) |
+
+## ⚙️ خدمة systemd (تشغيل دائم بعد إعادة التشغيل)
+
+```ini
+# /etc/systemd/system/phmp-server.service
+[Unit]
+Description=PHMP Local Server (SQLite)
+After=network.target
+
+[Service]
+Type=simple
+User=<المستخدم>
+WorkingDirectory=/مسار/المستودع/server
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=5
+Environment=PORT=3001
+Environment=JWT_SECRET=<سر-قوي-عشوائي>
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now phmp-server
+# خدمة النفق كذلك:
+sudo cloudflared service install   # بعد إعداد النفق الدائم
+```
+
+## 🛡️ قواعد أمان إلزامية
+
+1. **غيّر `JWT_SECRET`** — متغير بيئة إلزامي في الإنتاج.
+2. النفق يجب أن يبقى بعنوان غير معلن — الوصول للحساس محمي بـ JWT.
+3. لا ترفع `server/data/*.db` إلى Git (مستثناة في `.gitignore`).
+4. نسخ احتياطية يومياً مع الاحتفاظ بآخر 30 نسخة.
+5. راقب `audit_log` — أي عملية حذف جماعي يجب التحقق منها.
+
+## 🔁 التنسيق مع بقية الفريق (المساعد الرئيسي)
+
+- كل إنجاز يُسجَّل في `worklog.md` المشترك.
+- أي تعديل على مخطط قاعدة البيانات: حدّث `server/src/db.js` ثم شغّل `npm run seed`.
+- تحديثات الواجهة تأتي تلقائياً من المستودع (Cloudflare Pages يبني من `main`).
+- عند تحديث الأدوية من AMMPS: المساعد الرئيسي يحدّث `src/data/moroccanDrugs.js` ثم يدمج — المهم محلياً: `POST /api/sync` لإعادة المزامنة.

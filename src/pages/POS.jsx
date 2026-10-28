@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useApp } from '../contexts/AppContext'
+import InvoicePrint from '../components/InvoicePrint'
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote,
   Wallet, Building, Receipt, X, Check, User, Barcode,
@@ -7,7 +8,7 @@ import {
 } from 'lucide-react'
 
 const POS = () => {
-  const { t, isRTL, productsData, customersData, addSale, currentUser } = useApp()
+  const { t, isRTL, language, productsData, customersData, addSale, currentUser, currentPharmacy, pickName } = useApp()
   const [searchQuery, setSearchQuery] = useState('')
   const [cart, setCart] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -20,17 +21,18 @@ const POS = () => {
   const [completedSale, setCompletedSale] = useState(null)
   const [activeCategory, setActiveCategory] = useState('all')
 
+  const L = (ar, fr, en) => language === 'ar' ? ar : language === 'fr' ? fr : en
   const posCategories = [
     { id: 'all', label: t('all'), icon: '🏷️' },
-    { id: 'painkillers', label: isRTL ? 'مسكنات' : 'Painkillers', icon: '💊' },
-    { id: 'antibiotics', label: isRTL ? 'مضادات حيوية' : 'Antibiotics', icon: '🧬' },
-    { id: 'diabetes', label: isRTL ? 'سكري' : 'Diabetes', icon: '🩸' },
-    { id: 'cardiology', label: isRTL ? 'القلب' : 'Cardiology', icon: '❤️' },
-    { id: 'vitamins', label: isRTL ? 'فيتامينات' : 'Vitamins', icon: '🌟' },
-    { id: 'cold_flu', label: isRTL ? 'برد' : 'Cold', icon: '🤧' },
-    { id: 'skincare', label: isRTL ? 'بشرة' : 'Skincare', icon: '✨' },
-    { id: 'gastro', label: isRTL ? 'معدة' : 'Gastro', icon: '🫄' },
-    { id: 'neuro', label: isRTL ? 'أعصاب' : 'Neuro', icon: '🧠' },
+    { id: 'painkillers', label: L('مسكنات', 'Antalgiques', 'Painkillers'), icon: '💊' },
+    { id: 'antibiotics', label: L('مضادات حيوية', 'Antibiotiques', 'Antibiotics'), icon: '🧬' },
+    { id: 'diabetes', label: L('سكري', 'Diabète', 'Diabetes'), icon: '🩸' },
+    { id: 'cardiology', label: L('القلب', 'Cardiologie', 'Cardiology'), icon: '❤️' },
+    { id: 'vitamins', label: L('فيتامينات', 'Vitamines', 'Vitamins'), icon: '🌟' },
+    { id: 'cold_flu', label: L('برد', 'Rhume', 'Cold'), icon: '🤧' },
+    { id: 'skincare', label: L('بشرة', 'Peau', 'Skincare'), icon: '🧪' },
+    { id: 'gastro', label: L('معدة', 'Estomac', 'Gastro'), icon: '🫎' },
+    { id: 'neuro', label: L('أعصاب', 'Neuro', 'Neuro'), icon: '🧠' },
   ]
 
   const filteredProducts = useMemo(() => {
@@ -106,7 +108,9 @@ const POS = () => {
       discount: discountAmount,
       total: total,
       paymentMethod: paymentMethod,
-      cashier: currentUser?.name
+      cashier: currentUser?.name,
+      servedBy: currentUser?.name,
+      pharmacy: currentPharmacy,
     }
 
     const newSale = addSale(sale)
@@ -217,7 +221,7 @@ const POS = () => {
                   )}
                 </div>
                 <p className="font-semibold text-sm text-gray-900 line-clamp-2 leading-tight mb-1">
-                  {isRTL ? product.name : product.nameEn}
+                  {pickName(product)}
                 </p>
                 <p className="text-xs text-gray-500 mb-2 line-clamp-1">{product.dci || product.manufacturer}</p>
                 <div className="flex items-end justify-between">
@@ -304,28 +308,30 @@ const POS = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-900 truncate">
-                        {isRTL ? item.name : item.nameEn}
+                        {pickName(item)}
                       </p>
                       <p className="text-xs text-gray-500">{item.price} × {item.quantity}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => updateQuantity(item.productId, -1)}
-                        className="w-6 h-6 rounded bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-200"
+                        className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
+                        aria-label="-"
                       >
-                        <Minus className="w-3 h-3" />
+                        <Minus className="w-3.5 h-3.5" />
                       </button>
                       <span className="w-7 text-center text-xs font-bold">{item.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item.productId, 1)}
-                        className="w-6 h-6 rounded bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-200"
+                        className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
+                        aria-label="+"
                       >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     <button
                       onClick={() => removeFromCart(item.productId)}
-                      className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="p-1.5 text-red-500 hover:text-red-700 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -481,46 +487,24 @@ const POS = () => {
         </div>
       )}
 
-      {/* Receipt Modal */}
+      {/* Receipt Modal - فاتورة قابلة للطباعة (اسم الصيدلية + الأدوية + الأسعار + طريقة الدفع) */}
       {showReceiptModal && completedSale && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-slide-up">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto rounded-full bg-primary-100 flex items-center justify-center mb-3">
-                <Check className="w-8 h-8 text-primary-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900">{t('success')}</h3>
-              <p className="text-sm text-gray-500 mt-1">{completedSale.number}</p>
-
-              <div className="bg-gray-50 rounded-xl p-4 mt-6 text-start space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">{t('customer')}</span>
-                  <span className="font-semibold">{completedSale.customer.name}</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-slide-up my-8">
+            <div className="p-6">
+              <div className="text-center mb-4">
+                <div className="w-16 h-16 mx-auto rounded-full bg-primary-100 flex items-center justify-center mb-3">
+                  <Check className="w-8 h-8 text-primary-600" />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">{t('total')}</span>
-                  <span className="font-bold text-primary-600">{completedSale.total.toFixed(2)} {t('currency')}</span>
-                </div>
-                {completedSale.paymentMethod === 'cash' && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">{t('amountPaid')}</span>
-                      <span>{parseFloat(amountPaid).toFixed(2)} {t('currency')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">{t('change')}</span>
-                      <span className="font-semibold text-emerald-600">{change.toFixed(2)} {t('currency')}</span>
-                    </div>
-                  </>
-                )}
+                <h3 className="text-2xl font-bold text-gray-900">{t('success')}</h3>
+                <p className="text-sm text-gray-500 mt-1">{completedSale.number}</p>
               </div>
 
-              <div className="flex gap-2 mt-6">
-                <button onClick={() => window.print()} className="btn-secondary flex-1">
-                  <Printer className="w-4 h-4" />
-                  {t('print')}
-                </button>
+              <InvoicePrint sale={completedSale} mode="invoice" />
+
+              <div className="flex gap-2 mt-4">
                 <button onClick={newSale} className="btn-primary flex-1">
+                  <Receipt className="w-4 h-4" />
                   {t('newSale')}
                 </button>
               </div>

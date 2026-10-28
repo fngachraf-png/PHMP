@@ -2,9 +2,12 @@
 export const pharmacies = [
   {
     id: 'ph1',
-    name: 'صيدلية النور / Al Noor Pharmacy',
+    name: 'صيدلية النور',
     nameEn: 'Al Noor Pharmacy',
+    nameFr: 'Pharmacie Al Noor',
     address: 'شارع الحسن الثاني، الدار البيضاء',
+    addressEn: 'Hassan II Avenue, Casablanca',
+    addressFr: 'Avenue Hassan II, Casablanca',
     phone: '+212 522 123 456',
     email: 'alnoor@pharmacare.ma',
     license: 'PH-2024-001',
@@ -13,9 +16,12 @@ export const pharmacies = [
   },
   {
     id: 'ph2',
-    name: 'صيدلية الشفاء / Al Shifa Pharmacy',
+    name: 'صيدلية الشفاء',
     nameEn: 'Al Shifa Pharmacy',
+    nameFr: 'Pharmacie Al Shifa',
     address: 'حي المعاريف، الرباط',
+    addressEn: 'Maarif District, Rabat',
+    addressFr: 'Quartier Maarif, Rabat',
     phone: '+212 537 765 432',
     email: 'alshifa@pharmacare.ma',
     license: 'PH-2024-002',
@@ -24,9 +30,12 @@ export const pharmacies = [
   },
   {
     id: 'ph3',
-    name: 'صيدلية الحياة / Al Hayat Pharmacy',
+    name: 'صيدلية الحياة',
     nameEn: 'Al Hayat Pharmacy',
+    nameFr: 'Pharmacie Al Hayat',
     address: 'زنقة محمد الخامس، مراكش',
+    addressEn: 'Mohammed V Street, Marrakech',
+    addressFr: 'Rue Mohammed V, Marrakech',
     phone: '+212 524 333 999',
     email: 'alhayat@pharmacare.ma',
     license: 'PH-2024-003',
@@ -35,12 +44,16 @@ export const pharmacies = [
   }
 ]
 
+// المستخدمون - الأدوار: super_admin (مالك المنصة) > admin > accountant > pharmacist > cashier
 export const users = [
-  { id: 'u1', username: 'admin', password: 'admin', name: 'محمد الإدريسي', role: 'admin', pharmacyId: 'ph1', avatar: '👨‍⚕️' },
-  { id: 'u2', username: 'pharmacist', password: 'pharma', name: 'فاطمة الزهراء', role: 'pharmacist', pharmacyId: 'ph1', avatar: '👩‍⚕️' },
-  { id: 'u3', username: 'cashier', password: 'cashier', name: 'يوسف بن علي', role: 'cashier', pharmacyId: 'ph1', avatar: '🧑‍💼' },
-  { id: 'u4', username: 'admin2', password: 'admin', name: 'سعيد أمزيان', role: 'admin', pharmacyId: 'ph2', avatar: '👨‍💼' },
-  { id: 'u5', username: 'admin3', password: 'admin', name: 'نورة بنحمو', role: 'admin', pharmacyId: 'ph3', avatar: '👩‍💼' },
+  { id: 'u0', username: 'superadmin', password: 'super123', name: 'طارق الشويكة', nameEn: 'Tarik Chouika', role: 'super_admin', pharmacyId: null, avatar: '👑', active: true },
+  { id: 'u1', username: 'admin', password: 'admin', name: 'محمد الإدريسي', role: 'admin', pharmacyId: 'ph1', avatar: '👨‍⚕️', active: true },
+  { id: 'u2', username: 'pharmacist', password: 'pharma', name: 'فاطمة الزهراء', role: 'pharmacist', pharmacyId: 'ph1', avatar: '👩‍⚕️', active: true },
+  { id: 'u3', username: 'cashier', password: 'cashier', name: 'يوسف بن علي', role: 'cashier', pharmacyId: 'ph1', avatar: '🧑‍💼', active: true },
+  { id: 'u4', username: 'admin2', password: 'admin', name: 'سعيد أمزيان', role: 'admin', pharmacyId: 'ph2', avatar: '👨‍💼', active: true },
+  { id: 'u5', username: 'admin3', password: 'admin', name: 'نورة بنحمو', role: 'admin', pharmacyId: 'ph3', avatar: '👩‍💼', active: true },
+  { id: 'u6', username: 'accountant', password: 'account', name: 'خديجة الرامي', role: 'accountant', pharmacyId: 'ph1', avatar: '👩‍💻', active: true },
+  { id: 'u7', username: 'pharmacist2', password: 'pharma', name: 'أمينة الودغيري', role: 'pharmacist', pharmacyId: 'ph2', avatar: '👩‍⚕️', active: true },
 ]
 
 // Real Moroccan & international pharmaceutical products

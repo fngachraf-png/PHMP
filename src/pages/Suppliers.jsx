@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 
 const Suppliers = () => {
-  const { t, isRTL, suppliersData, addSupplier, updateSupplier, deleteSupplier } = useApp()
+  const { t, isRTL, suppliersData, addSupplier, updateSupplier, deleteSupplier , pickName, language} = useApp()
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -49,7 +49,7 @@ const Suppliers = () => {
             <Truck className="w-7 h-7 text-primary-600" />
             {t('suppliers')}
           </h1>
-          <p className="text-sm text-gray-600 mt-1">{suppliersData.length} {isRTL ? 'مورد' : 'suppliers'}</p>
+          <p className="text-sm text-gray-600 mt-1">{suppliersData.length} {language === 'ar' ? 'مورد' : language === 'fr' ? 'fournisseurs' : 'suppliers'}</p>
         </div>
         <button onClick={openNew} className="btn-primary">
           <Plus className="w-4 h-4" />
@@ -79,7 +79,7 @@ const Suppliers = () => {
                   <Truck className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <p className="font-bold text-gray-900">{isRTL ? supplier.name : supplier.nameEn}</p>
+                  <p className="font-bold text-gray-900">{pickName(supplier)}</p>
                   <p className="text-xs text-gray-500">{supplier.category}</p>
                 </div>
               </div>
@@ -106,12 +106,12 @@ const Suppliers = () => {
 
             <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-gray-100">
               <div className="text-center p-2 rounded-lg bg-primary-50">
-                <p className="text-xs text-gray-500">{isRTL ? 'الطلبات' : 'Orders'}</p>
+                <p className="text-xs text-gray-500">{language === 'ar' ? 'الطلبات' : language === 'fr' ? 'Commandes' : 'Orders'}</p>
                 <p className="font-bold text-primary-600">{supplier.totalOrders}</p>
               </div>
               <div className="text-center p-2 rounded-lg bg-blue-50">
-                <p className="text-xs text-gray-500">{isRTL ? 'الحالة' : 'Status'}</p>
-                <p className="font-bold text-blue-600 text-xs">{isRTL ? 'نشط' : 'Active'}</p>
+                <p className="text-xs text-gray-500">{language === 'ar' ? 'الحالة' : language === 'fr' ? 'Statut' : 'Status'}</p>
+                <p className="font-bold text-blue-600 text-xs">{language === 'ar' ? 'نشط' : language === 'fr' ? 'Actif' : 'Active'}</p>
               </div>
             </div>
 
@@ -121,7 +121,7 @@ const Suppliers = () => {
                 {t('edit')}
               </button>
               <button
-                onClick={() => confirm(isRTL ? 'حذف؟' : 'Delete?') && deleteSupplier(supplier.id)}
+                onClick={() => confirm(language === 'ar' ? 'حذف؟' : language === 'fr' ? 'Supprimer ?' : 'Delete?') && deleteSupplier(supplier.id)}
                 className="btn-danger text-xs py-1.5 px-3"
               >
                 <Trash2 className="w-3 h-3" />
@@ -174,7 +174,7 @@ const Suppliers = () => {
               </div>
               <div>
                 <label className="label">{t('category')}</label>
-                <input type="text" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="input" placeholder={isRTL ? 'مثال: أدوية' : 'e.g., Medicine'} />
+                <input type="text" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="input" placeholder={language === 'ar' ? 'مثال: أدوية' : language === 'fr' ? 'ex. : Médicaments' : 'e.g., Medicine'} />
               </div>
               <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">{t('cancel')}</button>

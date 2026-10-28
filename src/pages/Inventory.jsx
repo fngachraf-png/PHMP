@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 
 const Inventory = () => {
-  const { t, isRTL, productsData, categories, addProduct, updateProduct, deleteProduct, loadMoreProducts, fullDrugDatabase } = useApp()
+  const { t, isRTL, productsData, categories, addProduct, updateProduct, deleteProduct, loadMoreProducts, fullDrugDatabase , pickName, language} = useApp()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterCategory, setFilterCategory] = useState('all')
@@ -84,7 +84,7 @@ const Inventory = () => {
   }
 
   const handleDelete = (id) => {
-    if (confirm(isRTL ? 'هل أنت متأكد من الحذف؟' : 'Are you sure you want to delete?')) {
+    if (confirm(language === 'ar' ? 'هل أنت متأكد من الحذف؟' : language === 'fr' ? 'Confirmer la suppression ?' : 'Are you sure you want to delete?')) {
       deleteProduct(id)
     }
   }
@@ -111,7 +111,7 @@ const Inventory = () => {
             {t('inventory')}
           </h1>
           <p className="text-sm text-gray-600 mt-1">
-            {isRTL ? 'إدارة المنتجات والأدوية' : 'Manage products and medications'}
+            {language === 'ar' ? 'إدارة المنتجات والأدوية' : language === 'fr' ? 'Gestion des produits et médicaments' : 'Manage products and medications'}
           </p>
         </div>
         <div className="flex gap-2">
@@ -197,9 +197,9 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* Products Table */}
+      {/* Products Table - desktop */}
       <div className="card overflow-hidden">
-        <div className="table-container">
+        <div className="hidden md:block table-container">
           <table className="table">
             <thead>
               <tr>
@@ -230,7 +230,7 @@ const Inventory = () => {
                     <td>
                       <div>
                         <p className="font-semibold text-gray-900 text-sm">
-                          {isRTL ? product.name : product.nameEn}
+                          {pickName(product)}
                         </p>
                         <p className="text-xs text-gray-500">{product.dci || product.manufacturer}</p>
                         {product.requiresPrescription && (
@@ -243,7 +243,7 @@ const Inventory = () => {
                     </td>
                     <td>
                       <span className="badge-gray text-xs">
-                        {category?.icon} {isRTL ? category?.name?.split(' ')[0] : category?.nameEn?.split(' ')[0]}
+                        {category?.icon} {pickName(category).split(' ')[0]}
                       </span>
                     </td>
                     <td className="text-xs font-mono text-gray-600">{product.barcode}</td>
@@ -301,6 +301,61 @@ const Inventory = () => {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Products cards - mobile */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {filteredProducts.map(product => {
+            const stockStatus = getStockStatus(product)
+            const expiryStatus = getExpiryStatus(product)
+            const category = categories.find(c => c.id === product.category)
+            return (
+              <div key={product.id} className="p-4 space-y-2">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center text-xl shrink-0">
+                    {category?.icon || '💊'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm leading-snug">
+                      {pickName(product)}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">{product.dci || product.manufacturer}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {product.requiresPrescription && <span className="badge-info text-xs">Rx</span>}
+                      {product.princepsGenerique === 'G' && <span className="badge-success text-xs">{t('generic')}</span>}
+                      <span className={`badge ${stockStatus.class} text-xs`}>{stockStatus.label}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button onClick={() => openEditModal(product)} className="p-2 rounded-lg hover:bg-blue-50 text-blue-600" aria-label={t('edit')}>
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleDelete(product.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-600" aria-label={t('delete')}>
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="bg-gray-50 rounded-lg py-1.5">
+                    <p className="text-[10px] text-gray-500">{t('price')}</p>
+                    <p className="text-sm font-bold text-gray-900">{product.price?.toFixed(1)}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg py-1.5">
+                    <p className="text-[10px] text-gray-500">{t('stock')}</p>
+                    <p className={`text-sm font-bold ${product.stock <= 0 ? 'text-red-600' : product.stock < product.minStock ? 'text-amber-600' : 'text-gray-900'}`}>{product.stock}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg py-1.5">
+                    <p className="text-[10px] text-gray-500">{t('reimbursement')}</p>
+                    <p className="text-sm font-bold text-gray-900">{product.tauxRemboursement || '0%'}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg py-1.5">
+                    <p className="text-[10px] text-gray-500">{t('expiryDate')}</p>
+                    <p className="text-[11px] font-semibold mt-0.5">{product.expiry}</p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {/* Load More */}
@@ -479,7 +534,7 @@ const Inventory = () => {
                   value={formData.dosage}
                   onChange={(e) => setFormData({ ...formData, dosage: e.target.value })}
                   className="input"
-                  placeholder={isRTL ? 'مثال: قرص كل 8 ساعات' : 'e.g., 1 tablet every 8 hours'}
+                  placeholder={language === 'ar' ? 'مثال: قرص كل 8 ساعات' : language === 'fr' ? 'ex. : 1 comprimé toutes les 8 heures' : 'e.g., 1 tablet every 8 hours'}
                 />
               </div>
 

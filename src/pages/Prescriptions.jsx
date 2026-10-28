@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 
 const Prescriptions = () => {
-  const { t, isRTL, prescriptionsData, customersData, productsData, addPrescription, updatePrescription } = useApp()
+  const { t, isRTL, prescriptionsData, customersData, productsData, addPrescription, updatePrescription , pickName, language} = useApp()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [showModal, setShowModal] = useState(false)
@@ -53,7 +53,7 @@ const Prescriptions = () => {
       ...formData,
       medications: [...formData.medications, {
         productId: product.id,
-        name: isRTL ? product.name : product.nameEn,
+        name: pickName(product),
         dosage: newMed.dosage,
         duration: newMed.duration
       }]
@@ -97,7 +97,7 @@ const Prescriptions = () => {
             <FileText className="w-7 h-7 text-primary-600" />
             {t('prescriptions')}
           </h1>
-          <p className="text-sm text-gray-600 mt-1">{isRTL ? 'إدارة الوصفات الطبية' : 'Manage medical prescriptions'}</p>
+          <p className="text-sm text-gray-600 mt-1">{language === 'ar' ? 'إدارة الوصفات الطبية' : language === 'fr' ? 'Gestion des ordonnances médicales' : 'Manage medical prescriptions'}</p>
         </div>
         <button onClick={openNewModal} className="btn-primary">
           <Plus className="w-4 h-4" />
@@ -190,7 +190,7 @@ const Prescriptions = () => {
                         <li key={i} className="text-xs text-gray-600 truncate">• {m.name}</li>
                       ))}
                       {rx.medications.length > 2 && (
-                        <li className="text-xs text-primary-600">+ {rx.medications.length - 2} {isRTL ? 'أخرى' : 'more'}</li>
+                        <li className="text-xs text-primary-600">+ {rx.medications.length - 2} {language === 'ar' ? 'أخرى' : language === 'fr' ? 'autres' : 'more'}</li>
                       )}
                     </ul>
                   </div>
@@ -256,7 +256,7 @@ const Prescriptions = () => {
                     className="input"
                     required
                   >
-                    <option value="">{isRTL ? 'اختر مريض' : 'Select patient'}</option>
+                    <option value="">{language === 'ar' ? 'اختر مريض' : language === 'fr' ? 'Choisir un patient' : 'Select patient'}</option>
                     {customersData.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
@@ -269,7 +269,7 @@ const Prescriptions = () => {
                     value={formData.doctorName}
                     onChange={(e) => setFormData({ ...formData, doctorName: e.target.value })}
                     className="input"
-                    placeholder={isRTL ? 'د. اسم الطبيب' : 'Dr. Name'}
+                    placeholder={language === 'ar' ? 'د. اسم الطبيب' : language === 'fr' ? 'Dr Nom' : 'Dr. Name'}
                     required
                   />
                 </div>
@@ -282,7 +282,7 @@ const Prescriptions = () => {
                   value={formData.diagnosis}
                   onChange={(e) => setFormData({ ...formData, diagnosis: e.target.value })}
                   className="input"
-                  placeholder={isRTL ? 'مثال: التهاب الحلق' : 'e.g., Sore throat'}
+                  placeholder={language === 'ar' ? 'مثال: التهاب الحلق' : language === 'fr' ? 'ex. : Angine' : 'e.g., Sore throat'}
                   required
                 />
               </div>
@@ -310,7 +310,7 @@ const Prescriptions = () => {
                     onChange={(e) => setNewMed({ ...newMed, productId: e.target.value })}
                     className="input col-span-5 text-sm"
                   >
-                    <option value="">{isRTL ? 'اختر دواء' : 'Select med'}</option>
+                    <option value="">{language === 'ar' ? 'اختر دواء' : language === 'fr' ? 'Choisir un médicament' : 'Select med'}</option>
                     {productsData.filter(p => p.requiresPrescription).map(p => (
                       <option key={p.id} value={p.id}>{isRTL ? p.name : p.nameEn}</option>
                     ))}
@@ -319,14 +319,14 @@ const Prescriptions = () => {
                     type="text"
                     value={newMed.dosage}
                     onChange={(e) => setNewMed({ ...newMed, dosage: e.target.value })}
-                    placeholder={isRTL ? 'الجرعة' : 'Dosage'}
+                    placeholder={language === 'ar' ? 'الجرعة' : language === 'fr' ? 'Posologie' : 'Dosage'}
                     className="input col-span-4 text-sm"
                   />
                   <input
                     type="text"
                     value={newMed.duration}
                     onChange={(e) => setNewMed({ ...newMed, duration: e.target.value })}
-                    placeholder={isRTL ? 'المدة' : 'Duration'}
+                    placeholder={language === 'ar' ? 'المدة' : language === 'fr' ? 'Durée' : 'Duration'}
                     className="input col-span-2 text-sm"
                   />
                   <button type="button" onClick={addMedication} className="btn-primary text-sm py-2 px-3 col-span-1">

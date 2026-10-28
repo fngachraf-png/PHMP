@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 
 const Purchases = () => {
-  const { t, isRTL, suppliersData, productsData } = useApp()
+  const { t, isRTL, suppliersData, productsData , pickName, language} = useApp()
   const [searchQuery, setSearchQuery] = useState('')
 
   // Mock purchase orders
@@ -91,7 +91,7 @@ const Purchases = () => {
                 </div>
                 <div>
                   <p className="font-bold text-gray-900">{order.number}</p>
-                  <p className="text-xs text-gray-500">{isRTL ? order.supplier.name : order.supplier.nameEn}</p>
+                  <p className="text-xs text-gray-500">{pickName(order.supplier)}</p>
                 </div>
               </div>
               <span className={`badge ${order.status === 'received' ? 'badge-success' : 'badge-warning'} text-xs`}>
@@ -105,7 +105,7 @@ const Purchases = () => {
                 <p className="text-sm font-semibold">{order.date}</p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-gray-500">{isRTL ? 'المنتجات' : 'Items'}</p>
+                <p className="text-xs text-gray-500">{language === 'ar' ? 'المنتجات' : language === 'fr' ? 'Articles' : 'Items'}</p>
                 <p className="text-sm font-semibold">{order.items}</p>
               </div>
               <div className="text-center">

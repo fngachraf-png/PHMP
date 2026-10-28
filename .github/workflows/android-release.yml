@@ -1,0 +1,195 @@
+name: 🤖 Android Release (APK موقّع)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/android-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: بناء APK موقّع ونشر إصدار
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: ☕ Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 📦 بناء الواجهة
+        run: |
+          npm ci
+          npm run build
+
+      - name: 🤖 إضافة منصة أندرويد (Capacitor)
+        run: |
+          npm install --no-save @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap add android
+          npx cap sync android
+
+      - name: 📱 ملء الشاشة 100% وإخفاء أشرطة النظام (Immersive Mode)
+        run: |
+          # كتابة MainActivity بوضع غامر احترافي: يملأ التطبيق شاشة الهاتف بالكامل
+          # ويخفي شريط الحالة العلوي وشريط التنقل السفلي بشكل سلس، مع إعادة
+          # الإخفاء تلقائياً عند استعادة التركيز (سلوك Immersive Sticky الرسمي)
+          cat > android/app/src/main/java/com/phmp/pharmacare/MainActivity.java << 'JAVA'
+          package com.phmp.pharmacare;
+
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.WindowManager;
+          import androidx.core.view.WindowCompat;
+          import androidx.core.view.WindowInsetsCompat;
+          import androidx.core.view.WindowInsetsControllerCompat;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  enableImmersiveMode();
+              }
+
+              /**
+               * ملء الشاشة 100%:
+               * - FLAG_LAYOUT_NO_LIMITS: تمتد الواجهة خلف شريطي النظام
+               * - hide(systemBars): إخفاء الشريط العلوي والسفلي
+               * - BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE: الظهور المؤقت بالسحب ثم الاختفاء
+               */
+              private void enableImmersiveMode() {
+                  try {
+                      android.view.Window window = getWindow();
+                      window.setFlags(
+                          WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                          WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                      );
+                      WindowCompat.setDecorFitsSystemWindows(window, false);
+                      WindowInsetsControllerCompat controller =
+                          new WindowInsetsControllerCompat(window, window.getDecorView());
+                      controller.setSystemBarsBehavior(
+                          WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                      );
+                      controller.hide(WindowInsetsCompat.Type.systemBars());
+                      controller.hide(WindowInsetsCompat.Type.displayCutout());
+                  } catch (Exception ignored) {
+                      // التوافق مع الأجهزة القديمة: الشاشة الكاملة تبقى فعالة عبر الثيم
+                  }
+              }
+
+              @Override
+              public void onWindowFocusChanged(boolean hasFocus) {
+                  super.onWindowFocusChanged(hasFocus);
+                  // إعادة الإخفاء بسلاسة بعد أي مقاطعة (لوحة الإشعارات، الحوار...)
+                  if (hasFocus) {
+                      enableImmersiveMode();
+                  }
+              }
+          }
+          JAVA
+
+          # تفعيل الشاشة الكاملة في الثيم أيضاً (دعم إضافي للأجهزة القديمة)
+          STYLES="android/app/src/main/res/values/styles.xml"
+          if [ -f "$STYLES" ]; then
+            sed -i 's|<style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">|<style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">\n        <item name="android:windowFullscreen">true</item>|' "$STYLES"
+            sed -i 's|<style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">|<style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">\n        <item name="android:windowFullscreen">true</item>\n        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>|' "$STYLES" || true
+          fi
+
+          echo "--- MainActivity (immersive) ---"
+          grep -c "enableImmersiveMode" android/app/src/main/java/com/phmp/pharmacare/MainActivity.java
+
+      - name: 🎨 نسخ الأيقونات المخصصة
+        run: |
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp android-resources/icons/mipmap-${density}/ic_launcher.png android/app/src/main/res/mipmap-${density}/ic_launcher.png
+            cp android-resources/icons/mipmap-${density}/ic_launcher.png android/app/src/main/res/mipmap-${density}/ic_launcher_round.png
+          done
+
+      - name: 🔐 فك شهادة التوقيع
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: ⚙️ ضخ إعدادات التوقيع في build.gradle
+        run: |
+          sed -i 's/^android {$/android {\n    signingConfigs {\n        release {\n            storeFile file("release.keystore")\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }/' android/app/build.gradle
+          sed -i 's/^        release {$/        release {\n            signingConfig signingConfigs.release/' android/app/build.gradle
+          echo "--- signing config (verification) ---"
+          grep -A 10 'signingConfigs' android/app/build.gradle | head -13 || exit 1
+
+      - name: 🔨 بناء APK الموقّع
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -x lint
+
+      - name: 📋 فحص توقيع APK
+        run: |
+          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs \
+            android/app/build/outputs/apk/release/app-release.apk | head -5
+
+      - name: 🏷️ إعداد رقم الإصدار
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}-b${GITHUB_RUN_NUMBER}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "الإصدار: $TAG"
+
+      - name: 📦 تجهيز ملف التوزيع
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk PharmaCare-Pro.apk
+          sha256sum PharmaCare-Pro.apk > PharmaCare-Pro.apk.sha256
+          ls -lh PharmaCare-Pro.apk
+
+      - name: 🚀 نشر إصدار GitHub (رابط التحميل الدائم)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "PharmaCare Pro ${{ steps.version.outputs.tag }}"
+          body: |
+            # 📱 PharmaCare Pro — إصدار أندرويد ${{ steps.version.outputs.tag }}
+
+            **التوقيع**: CN=TARIK CHOUIKA (شهادة صلاحيتها 30 سنة)
+
+            ## ⬇️ التحميل المباشر (دائم - يحمل آخر إصدار دائماً)
+            ```
+            https://github.com/fngachraf-png/PHMP/releases/latest/download/PharmaCare-Pro.apk
+            ```
+
+            ## ✨ مستجدات هذا الإصدار
+            - نظام صلاحيات متكامل: مالك المنصة / مدير / محاسب / صيدلاني / كاشير
+            - توافق كامل مع الهواتف والحواسيب
+            - المراجع القانونية واللوائح المغربية للأدوية (AMMPS / وزارة الصحة)
+            - دعم المزامنة مع قاعدة البيانات المحلية SQLite عبر النفق الدائم
+
+            ## 🔧 التثبيت
+            1. حمّل ملف `PharmaCare-Pro.apk`
+            2. فعّل "التثبيت من مصادر غير معروفة" في هاتفك إن طُلب
+            3. ثبّت وافتح التطبيق
+          files: |
+            PharmaCare-Pro.apk
+            PharmaCare-Pro.apk.sha256
+          make_latest: true

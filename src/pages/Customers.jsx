@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 
 const Customers = () => {
-  const { t, isRTL, customersData, addCustomer, updateCustomer, deleteCustomer } = useApp()
+  const { t, isRTL, customersData, addCustomer, updateCustomer, deleteCustomer , pickName, language} = useApp()
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -54,7 +54,7 @@ const Customers = () => {
             <User className="w-7 h-7 text-primary-600" />
             {t('customers')}
           </h1>
-          <p className="text-sm text-gray-600 mt-1">{customersData.length} {isRTL ? 'عميل مسجل' : 'registered customers'}</p>
+          <p className="text-sm text-gray-600 mt-1">{customersData.length} {language === 'ar' ? 'عميل مسجل' : language === 'fr' ? 'clients enregistrés' : 'registered customers'}</p>
         </div>
         <button onClick={openNew} className="btn-primary">
           <Plus className="w-4 h-4" />
@@ -129,7 +129,7 @@ const Customers = () => {
                 {t('edit')}
               </button>
               <button
-                onClick={() => confirm(isRTL ? 'حذف؟' : 'Delete?') && deleteCustomer(customer.id)}
+                onClick={() => confirm(language === 'ar' ? 'حذف؟' : language === 'fr' ? 'Supprimer ?' : 'Delete?') && deleteCustomer(customer.id)}
                 className="btn-danger text-xs py-1.5 px-3"
               >
                 <Trash2 className="w-3 h-3" />

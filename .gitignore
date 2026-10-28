@@ -59,3 +59,10 @@ out/
 *.mp3
 videos/
 *.pdf
+server/data/
+server/node_modules/
+server/server.log
+*.db
+*.db-wal
+*.db-shm
+quick-tunnel-url.txt

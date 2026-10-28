@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
-import { Stethoscope, Lock, User as UserIcon, Building2, Globe, Eye, EyeOff, ShieldCheck, Pill, Sparkles } from 'lucide-react'
+import { Stethoscope, Lock, User as UserIcon, Building2, Eye, EyeOff, ShieldCheck, Pill, Sparkles, ShoppingBag } from 'lucide-react'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 
 const Login = () => {
-  const { t, language, setLanguage, login, pharmacies, users, isRTL } = useApp()
+  const { t, language, login, pharmacies, users, isRTL, pickName } = useApp()
   const [selectedPharmacy, setSelectedPharmacy] = useState('ph1')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -11,37 +13,59 @@ const Login = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleLogin = (e) => {
-    e?.preventDefault()
+  const L = (ar, fr, en) => language === 'ar' ? ar : language === 'fr' ? fr : en
+
+  // منطق الدخول الفعلي - يستقبل القيم مباشرة لتفادي الإغلاق القديم (stale closure)
+  const doLogin = (u, p, pharmacyId) => {
     setError('')
     setLoading(true)
-
     setTimeout(() => {
-      const user = users.find(u => u.username === username && u.password === password)
-      const pharmacy = pharmacies.find(p => p.id === selectedPharmacy)
+      const user = users.find(x => x.username === u && x.password === p)
+      const pharmacy = pharmacies.find(ph => ph.id === (pharmacyId || selectedPharmacy))
 
       if (user) {
-        login(user, pharmacy)
+        if (user.active === false) {
+          setError(t('accountSuspended'))
+          setLoading(false)
+          return
+        }
+        // السوبر أدمين (مالك المنصة) لا يرتبط بصيدلية محددة
+        if (user.role === 'super_admin') {
+          login(user, null)
+        } else {
+          login(user, pharmacy || pharmacies.find(ph => ph.id === user.pharmacyId))
+        }
       } else {
-        setError(language === 'ar' ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials')
+        setError(t('invalidCredentials'))
       }
       setLoading(false)
     }, 600)
   }
 
+  const handleLogin = (e) => {
+    e?.preventDefault()
+    doLogin(username, password)
+  }
+
   const quickLogin = (role) => {
     const credentials = {
+      super_admin: { username: 'superadmin', password: 'super123' },
       admin: { username: 'admin', password: 'admin' },
+      accountant: { username: 'accountant', password: 'account' },
       pharmacist: { username: 'pharmacist', password: 'pharma' },
       cashier: { username: 'cashier', password: 'cashier' },
     }
-    setUsername(credentials[role].username)
-    setPassword(credentials[role].password)
-    setTimeout(() => handleLogin(), 100)
+    const cred = credentials[role]
+    setUsername(cred.username)
+    setPassword(cred.password)
+    // اختيار الصيدلية المناسبة تلقائياً
+    const user = users.find(u => u.username === cred.username)
+    if (user?.pharmacyId) setSelectedPharmacy(user.pharmacyId)
+    doLogin(cred.username, cred.password, user?.pharmacyId)
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary-50 via-white to-primary-100 relative overflow-hidden">
+    <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-gradient-to-br from-primary-50 via-white to-primary-100 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse-slow" />
@@ -56,10 +80,10 @@ const Login = () => {
             key={i}
             className="absolute text-4xl opacity-10 animate-pulse-slow"
             style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
+              top: `${(i * 13 + 7) % 100}%`,
+              left: `${(i * 17 + 11) % 100}%`,
               animationDelay: `${i * 0.5}s`,
-              animationDuration: `${3 + Math.random() * 2}s`
+              animationDuration: `${3 + (i % 3)}s`
             }}
           >
             {['💊', '🩺', '⚕️', '🧬', '💉', '🧴', '🩹', '🩸'][i]}
@@ -67,16 +91,12 @@ const Login = () => {
         ))}
       </div>
 
-      {/* Language toggle */}
-      <button
-        onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-        className="absolute top-6 right-6 z-10 flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md shadow-md border border-white/40 hover:bg-white transition-all"
-      >
-        <Globe className="w-4 h-4 text-primary-600" />
-        <span className="text-sm font-medium">{language === 'ar' ? 'English' : 'العربية'}</span>
-      </button>
+      {/* Language switcher (عربي / Français / English) */}
+      <div className="absolute top-6 z-10" style={{ [isRTL ? 'left' : 'right']: '1.5rem' }}>
+        <LanguageSwitcher variant="pill" />
+      </div>
 
-      <div className="relative w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center z-10">
+      <div className="relative w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center z-10 py-8">
         {/* Left side - branding */}
         <div className="hidden lg:block space-y-6 animate-slide-up">
           <div className="flex items-center gap-3">
@@ -90,23 +110,27 @@ const Login = () => {
           </div>
 
           <h2 className="text-4xl xl:text-5xl font-bold text-gray-900 leading-tight text-balance">
-            {language === 'ar'
-              ? 'إدارة صيدليتك بذكاء واحترافية'
-              : 'Manage your pharmacy intelligently and professionally'}
+            {L(
+              'إدارة صيدليتك بذكاء واحترافية',
+              'Gérez votre pharmacie avec intelligence et professionnalisme',
+              'Manage your pharmacy intelligently and professionally'
+            )}
           </h2>
 
           <p className="text-lg text-gray-600 max-w-md">
-            {language === 'ar'
-              ? 'نظام متكامل لإدارة المخزون، المبيعات، الوصفات الطبية، والمزيد - كل ذلك في مكان واحد.'
-              : 'A comprehensive system for inventory management, sales, prescriptions, and more — all in one place.'}
+            {L(
+              'نظام متكامل لإدارة المخزون، المبيعات، الوصفات الطبية، والمزيد - كل ذلك في مكان واحد.',
+              'Un système complet pour la gestion des stocks, des ventes, des ordonnances et plus encore — tout en un seul endroit.',
+              'A comprehensive system for inventory management, sales, prescriptions, and more — all in one place.'
+            )}
           </p>
 
           <div className="grid grid-cols-2 gap-4 pt-4">
             {[
-              { icon: Pill, title: language === 'ar' ? 'إدارة المخزون' : 'Inventory Management', color: 'emerald' },
-              { icon: ShieldCheck, title: language === 'ar' ? 'أمان عالي' : 'High Security', color: 'blue' },
-              { icon: Sparkles, title: language === 'ar' ? 'سهولة الاستخدام' : 'Easy to Use', color: 'purple' },
-              { icon: Building2, title: language === 'ar' ? 'متعدد الفروع' : 'Multi-branch', color: 'amber' },
+              { icon: Pill, title: L('إدارة المخزون', 'Gestion des stocks', 'Inventory Management'), color: 'emerald' },
+              { icon: ShieldCheck, title: L('أمان عالي', 'Sécurité renforcée', 'High Security'), color: 'blue' },
+              { icon: Sparkles, title: L('سهولة الاستخدام', "Facile à utiliser", 'Easy to Use'), color: 'purple' },
+              { icon: Building2, title: L('متعدد الفروع', 'Multi-pharmacies', 'Multi-branch'), color: 'amber' },
             ].map((feature, i) => (
               <div
                 key={i}
@@ -134,7 +158,7 @@ const Login = () => {
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">{t('login')}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-1">{t('staffEntrance')}</h2>
           <p className="text-sm text-gray-600 mb-6">{t('loginSubtitle')}</p>
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -151,7 +175,7 @@ const Login = () => {
               >
                 {pharmacies.map(ph => (
                   <option key={ph.id} value={ph.id}>
-                    {ph.logo} {isRTL ? ph.name : ph.nameEn}
+                    {ph.logo} {pickName(ph)}
                   </option>
                 ))}
               </select>
@@ -224,12 +248,29 @@ const Login = () => {
             </button>
           </form>
 
+          {/* ===== دخول الزبناء (واجهة شراء الدواء) ===== */}
+          <Link
+            to="/shop"
+            className="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-primary-500 bg-primary-50 text-primary-700 hover:bg-primary-100 font-bold transition-all"
+          >
+            <ShoppingBag className="w-5 h-5" />
+            {t('customerEntrance')} — {t('shopTitle')}
+          </Link>
+
           {/* Demo accounts */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
               {t('demoAccounts')}
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => quickLogin('super_admin')}
+                className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gradient-to-br from-violet-50 to-violet-100 hover:from-violet-100 hover:to-violet-200 transition-all border border-violet-200"
+              >
+                <span className="text-2xl">👑</span>
+                <span className="text-xs font-semibold text-violet-800 text-center leading-tight">{t('loginAsSuperAdmin')}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => quickLogin('admin')}
@@ -237,6 +278,14 @@ const Login = () => {
               >
                 <span className="text-2xl">👨‍⚕️</span>
                 <span className="text-xs font-semibold text-primary-800">{t('loginAsAdmin')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => quickLogin('accountant')}
+                className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200 transition-all border border-amber-200"
+              >
+                <span className="text-2xl">📊</span>
+                <span className="text-xs font-semibold text-amber-800">{t('loginAsAccountant')}</span>
               </button>
               <button
                 type="button"
@@ -249,10 +298,10 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => quickLogin('cashier')}
-                className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200 transition-all border border-amber-200"
+                className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 transition-all border border-gray-200"
               >
                 <span className="text-2xl">🧑‍💼</span>
-                <span className="text-xs font-semibold text-amber-800">{t('loginAsCashier')}</span>
+                <span className="text-xs font-semibold text-gray-800">{t('loginAsCashier')}</span>
               </button>
             </div>
           </div>
