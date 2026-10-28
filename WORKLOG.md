@@ -16,22 +16,24 @@
 | نشر احتياطي | https://pharmacare-pro-jade.vercel.app (Vercel — ثابت) |
 | تحميل تطبيق أندرويد | https://phmp-download.pages.dev/PharmaCare-Pro.apk |
 | البنية | React 18 + Vite 5 + Tailwind 3 + React Router 6 (واجهة، بيانات localStorage) |
-| الخادم المحلي | `server/` — Express + SQLite (JWT + bcrypt) + نفق Cloudflare |
+| الخادم المحلي | `server/` — Express + SQLite (JWT + bcrypt) + Workers VPC + نفق دائم: `https://phmp-api.balbolghol-ai.workers.dev` |
 | قاعدة الأدوية | 5917 دواء من اللائحة الرسمية المغربية (`src/data/moroccanDrugs.js`) |
 | اللغات | العربية (RTL) / الفرنسية / الإنجليزية (`src/i18n/{ar,fr,en}.js`) |
-| الإصدار الحالي | **v1.3.0** (انظر CHANGELOG.md) |
+| الإصدار الحالي | **v1.4.0** (انظر CHANGELOG.md) |
 
-## 🔑 حسابات الدخول الافتراضية (تجريبية)
+## 🔑 حسابات الدخول
 
-| الدور | المستخدم | كلمة المرور | ملاحظات |
-|---|---|---|---|
-| 👑 مالك المنصة (super_admin) | `superadmin` | `super123` | كل الصلاحيات + كل الصيدليات |
-| 🛡️ مدير الصيدلية (admin) | `admin` | `admin` | صيدليته فقط |
-| 📊 محاسب (accountant) | `accountant` | `account` | التقارير + المشتريات + الموردون |
-| ⚕️ صيدلاني (pharmacist) | `pharmacist` | `pharma` | نقطة البيع + الوصفات + المخزون |
-| 🧾 كاشير (cashier) | `cashier` | `cashier` | نقطة البيع + الطلبات المباشرة |
+| الدور | المستخدم | كلمة مرور الخادم |
+|---|---|---|
+| 👑 مالك المنصة (super_admin) | `superadmin` | مُولّدة عشوائياً — سُلّمت للمالك |
+| 🛡️ مدير الصيدلية (admin) | `admin` / `admin2` / `admin3` | مُولّدة عشوائياً — سُلّمت للمالك |
+| 📊 محاسب (accountant) | `accountant` | مُولّدة عشوائياً — سُلّمت للمالك |
+| ⚕️ صيدلاني (pharmacist) | `pharmacist` / `pharmacist2` | مُولّدة عشوائياً — سُلّمت للمالك |
+| 🧾 كاشير (cashier) | `cashier` | مُولّدة عشوائياً — سُلّمت للمالك |
 
-> نقطة الدخول: زر 🔒 «دخول الموظفين» في ترويسة المتجر `/shop` أو الرابط `/login`.
+> - **كلمات مرور الخادم (SQLite/API)**: قوية وعشوائية، عُطّلت القيم القديمة (`super123` وغيرها). لا تُكتب في المستودع ولا في أي ملف غير محمي؛ مصدرها `/root/.credentials/phmp.json` (600) على جهاز المالك.
+> - **أزرار الدخول السريع في `/login`**: تخصّ **العرض المحلي** (localStorage) فقط، ولا تمنح أي وصول إلى API أو قاعدة SQLite. ليست اعتمادات خادم.
+> - نقطة الدخول: زر 🔒 «دخول الموظفين» في ترويسة المتجر `/shop` أو الرابط `/login`.
 
 ---
 
@@ -160,15 +162,65 @@ Stage Summary:
   قانونية ومن نحن ودليل استخدام + ملفات تنسيق المساعدين
 
 ---
+Task ID: 5
+Agent: Local Server Agent
+Date: 2026-10-29
+Task: v1.4.0 — البيئة المحلية الدائمة (SQLite + Workers VPC + نفق ثابت) وتحصين API
+
+Work Log:
+- الاستكشاف: `phmp.pages.dev` و`phmplatform.vercel.app` يعيدان 200 لكنهما غلاف SPA فقط (1601B)؛ لا خادم/قاعدة محلية.
+- البنية المختارة: لا توجد Zone على حساب Cloudflare، لذا تعذّر ربط hostname مخصص بنفق named. الحل المثبت:
+  Worker (workers.dev) → Workers VPC service `phmp-app` → نفق `phmp-api` → `127.0.0.1:3001`.
+  * Worker: `infra/cloudflare/phmp-api/` — binding `env.PHMP` + حقن `x-phmp-client-ip`.
+  * VPC service: `01a184a7-cc40-7a01-8dd9-a0f034b2b71e` | Tunnel: `276f9bee-2dca-491a-8105-a441f7547852`.
+  * العنوان الثابت: https://phmp-api.balbolghol-ai.workers.dev
+- الخادم (`server/src/index.js`):
+  * تحميل `.env` + فشل سريع عند غياب `JWT_SECRET`/`PHMP_API_KEY`.
+  * مفتاح API على `/api/sync|data|backup` (ترويسة `x-phmp-key`) بمقارنة آمنة.
+  * تحديد معدل الدخول 10/15د + CORS بقائمة أصول + ترويسات أمان.
+  * سجل تدقيق على الخادم مع IP الحقيقي (عبر `cf-connecting-ip` من Worker).
+  * مزامنة المستخدمين/الصيدليات مع bcrypt وتطبيع الحقول (إصلاح إسقاط صامت).
+  * إصلاح تصعيد صلاحيات: مدير الصيدلية لا ينشئ/يعدّل `super_admin` ولا مستخدمي صيدليات أخرى.
+  * تضييق CORS: فقط نطاقات المشروع (`phmp.pages.dev` ومعاينات Vercel الخاصة به) بدل أي `*.vercel.app`.
+  * نسخ احتياطي `VACUUM INTO` + إيقاف آمن.
+- `server/src/seed.js`: كلمات المرور من `PHMP_SEED_PASSWORDS_FILE` فقط، ولا تُطبع.
+- قاعدة SQLite: 8 مستخدمين + 3 صيدليات؛ كلمات المرور القديمة → 401.
+- الاعتمادات: `/root/.credentials/phmp.json` (600) + `server/.env` (600) — غير مرفوعة.
+- الواجهة: `src/lib/api.js` يستعمل العنوان الثابت + ترويسة المفتاح (من localStorage أو `VITE_PHMP_API_KEY` اختياري)؛ حقل مفتاح API في الإعدادات (ar/fr/en).
+- الديمومة: `phmp-guard.sh` (boot/check/restart/status) عبر cron: `@reboot` + كل 5 دقائق؛ نسخ احتياطي يومي 03:20.
+- إصلاح جذري: الحارس كان يستعمل `~/.local/bin/cloudflared` (npm 2026.10.1) الذي تجمّد بعد تهيئة ICMP بلا أي اتصال. تم تثبيت `/usr/local/bin/cloudflared` (2026.10.4) + منفذ metrics ثابت 20244، والحارس يفحص `/ready` لا وجود العملية فقط.
+
+Testing (من عناوين عامة، لا localhost):
+- `/api/health` → 200؛ تسجيل دخول قوي → 200؛ `super123` → 401.
+- `/api/data` و`/api/sync` بلا مفتاح → 401؛ بالمفتاح → 200؛ `/api/backup` → 200 JSON.
+- CORS: `https://phmp.pages.dev` مسموح؛ `https://evil.example` بلا ترويسة.
+- تحديد المعدل: 429 بعد 10 محاولات.
+- سجل التدقيق: IP عمومي حقيقي.
+- RBAC: مدير الصيدلية لا ينشئ `super_admin` (403)، ولا يعدّل/يحذف مستخدمي صيدلية أخرى (403)، ولا يرى إلا مستخدمي صيدليته.
+- CORS: `phmplatform.vercel.app` مسموح، `evil.vercel.app` مرفوض.
+- تعافي cron: إعادة تشغيل النفق/الخادم تلقائياً بعد الفشل.
+- نسخة احتياطية: 98KB، 9 جداول، `quick_check=ok`.
+
+Deployment:
+- GitHub Actions: تحديث أسرار `CLOUDFLARE_API_TOKEN` و`CLOUDFLARE_ACCOUNT_ID` (التوكن القديم كان يعيد 9109).
+- Cloudflare Pages: بانتظار اكتمال البناء والتحقق من https://phmp.pages.dev.
+- Vercel: يبقى v1.2.0 حتى توفير رمز Vercel.
+
+Stage Summary:
+- البيئة المحلية الدائمة تعمل وتُراقَب آلياً. المتبقي: التحقق من نشر Pages، وتحديث Vercel عند توفر الرمز، وربط JWT الكامل مستقبلاً.
+- حدّ أمني معروف: مفتاح API حاجز ضد الفاحصين وليس سراً؛ لا يُضمَّن في حزمة الواجهة العامة، ويُدخل مرة واحدة في الإعدادات. الحماية الفعلية تحتاج ربط الدخول بـ JWT.
+
+---
 
 ## 📌 التوجيهات الحالية للمساعدين
 
 ### المساعد المحلي (Local Server Agent) — راجع `LOCAL_ENVIRONMENT.md` بالتفصيل
-1. تنصيب وتشغيل الخادم: `cd server && npm install && npm run seed && npm start` (منفذ 3001)
-2. فحص الصحة كل 5 دقائق: `curl localhost:3001/api/health`
-3. نسخ احتياطي يومي عبر `/api/backup` مع الاحتفاظ بآخر 30 نسخة
-4. إعداد النفق الدائم (`server/tunnel/setup-tunnel.sh`) وتحديث العنوان في المنصة
-5. **ممنوع** مزامنة الطلبات/الدردشة مع الخادم (امتثال لمطلب المالك)
+1. التشغيل والحماية: `phmp-guard.sh boot` عند الإقلاع و`check` كل 5 دقائق (مثبتان في cron).
+2. فحص الصحة من العنوان العام: `curl https://phmp-api.balbolghol-ai.workers.dev/api/health` — وليس localhost.
+3. نسخ احتياطي يومي 03:20 عبر `server/scripts/backup.sh` مع الاحتفاظ بآخر 30 نسخة.
+4. النفق/الـVPC: `server/tunnel/setup-tunnel.sh` يوثّق إعادة الإنتاج؛ **لا تغيّر العنوان الثابت**.
+5. الأسرار في `server/.env` (600) فقط؛ مفتاح API يُدخل في الإعدادات ولا يُضمَّن في حزمة الواجهة.
+6. **ممنوع** مزامنة الطلبات/الدردشة مع الخادم (امتثال لمطلب المالك).
 
 ### أولويات العمل القادمة (مرشحة — لاتخذها إلا بتكليف من المالك)
 - [ ] ربط تسجيل الدخول بالخادم المحلي (JWT) بدل mockData عند توفر النفق الدائم

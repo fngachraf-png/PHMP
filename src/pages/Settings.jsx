@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { ROLE_INFO } from '../config/permissions'
-import { setApiUrl, getApiUrl } from '../lib/api'
+import { setApiUrl, getApiUrl, setApiKey, getApiKey } from '../lib/api'
 import {
   Settings as SettingsIcon, Globe, Bell, Shield, Database,
   Building2, Users, Palette, Save, Mail, Phone, MapPin, FileText,
@@ -18,6 +18,7 @@ const Settings = () => {
   const [showUserModal, setShowUserModal] = useState(null)
   const [userForm, setUserForm] = useState({ name: '', username: '', password: '', role: 'pharmacist', pharmacyId: 'ph1', avatar: '👤' })
   const [apiUrlInput, setApiUrlInput] = useState(getApiUrl())
+  const [apiKeyInput, setApiKeyInput] = useState(getApiKey())
   const [syncing, setSyncing] = useState(false)
   const [notifications, setNotifications] = useState({
     lowStock: true,
@@ -334,11 +335,27 @@ const Settings = () => {
               <div>
                 <label className="label">{language === 'ar' ? 'عنوان الخادم (النفق)' : language === 'fr' ? 'URL du serveur (tunnel)' : 'Server URL (tunnel)'}</label>
                 <div className="flex gap-2">
-                  <input className="input" dir="ltr" value={apiUrlInput} onChange={e => setApiUrlInput(e.target.value)} placeholder="https://phmp-api.trycloudflare.com" />
+                  <input className="input" dir="ltr" value={apiUrlInput} onChange={e => setApiUrlInput(e.target.value)} placeholder="https://phmp-api.balbolghol-ai.workers.dev" />
                   <button className="btn-secondary" onClick={() => { setApiUrl(apiUrlInput); window.location.reload() }}>
                     <Save className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
+              <div>
+                <label className="label">{language === 'ar' ? 'مفتاح API (للمزامنة والنسخ الاحتياطي)' : language === 'fr' ? 'Clé API (synchro et sauvegarde)' : 'API key (sync & backup)'}</label>
+                <div className="flex gap-2">
+                  <input className="input" dir="ltr" type="password" value={apiKeyInput} onChange={e => setApiKeyInput(e.target.value)} placeholder="phmp_..." autoComplete="off" />
+                  <button className="btn-secondary" onClick={() => { setApiKey(apiKeyInput); window.location.reload() }}>
+                    <Save className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {language === 'ar'
+                    ? 'مطلوب لمزامنة البيانات مع SQLite. يُحفظ في هذا المتصفح فقط.'
+                    : language === 'fr'
+                      ? 'Requis pour synchroniser avec SQLite. Stocké dans ce navigateur uniquement.'
+                      : 'Required to sync with SQLite. Stored in this browser only.'}
+                </p>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
                 <div>

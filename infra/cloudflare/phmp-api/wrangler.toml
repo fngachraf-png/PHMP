@@ -1,0 +1,12 @@
+# PHMP — بوابة API العامة عبر Workers VPC إلى خادم الهاتف خلف النفق
+# العنوان الثابت: https://phmp-api.balbolghol-ai.workers.dev
+# الخدمة: phmp-app (VPC) → نفق phmp-api → 127.0.0.1:3001
+name = "phmp-api"
+main = "src/index.js"
+compatibility_date = "2026-10-28"
+workers_dev = true
+
+[[vpc_services]]
+binding = "PHMP"
+service_id = "01a184a7-cc40-7a01-8dd9-a0f034b2b71e"
+remote = true

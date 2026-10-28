@@ -61,6 +61,8 @@ videos/
 *.pdf
 server/data/
 server/node_modules/
+server/logs/
+server/run/
 server/server.log
 *.db
 *.db-wal

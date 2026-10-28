@@ -1,11 +1,28 @@
 // PHMP - تهيئة قاعدة البيانات ببيانات البداية (Seed)
 // المستخدمون بكلمات مرور مشفرة bcrypt
 import bcrypt from 'bcryptjs'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { db, initSchema, setMeta } from './db.js'
+
+try {
+  process.loadEnvFile(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.env'))
+} catch { /* اختياري */ }
 
 initSchema()
 
 const SALT_ROUNDS = 10
+
+// كلمات المرور: من ملف اعتمادات محمي (600) عند ضبط PHMP_SEED_PASSWORDS_FILE.
+// لا تُطبع أبداً في السجل، ولا تُستعمل القيم الافتراضية في الإنتاج.
+const passwordsFile = process.env.PHMP_SEED_PASSWORDS_FILE
+let securePasswords = {}
+if (passwordsFile) {
+  securePasswords = JSON.parse(fs.readFileSync(passwordsFile, 'utf8')).users || {}
+} else {
+  console.warn('⚠️ PHMP_SEED_PASSWORDS_FILE غير مضبوط — تُستعمل كلمات مرور تجريبية ضعيفة. لا تصلح للإنتاج.')
+}
 
 const pharmacies = [
   { id: 'ph1', name: 'صيدلية النور / Al Noor Pharmacy', nameEn: 'Al Noor Pharmacy', address: 'شارع الحسن الثاني، الدار البيضاء', phone: '+212 522 123 456', email: 'alnoor@pharmacare.ma', license: 'PH-2024-001', logo: '💊', color: 'emerald' },
@@ -33,7 +50,12 @@ console.log('⏳ تهيئة قاعدة البيانات...')
 for (const ph of pharmacies) insertPharmacy.run(ph)
 
 for (const u of users) {
-  const passwordHash = bcrypt.hashSync(u.password, SALT_ROUNDS)
+  const plain = passwordsFile ? securePasswords[u.username] : u.password
+  if (!plain) {
+    console.error(`❌ لا توجد كلمة مرور للمستخدم ${u.username} — أضفها في ملف الاعتمادات.`)
+    process.exit(1)
+  }
+  const passwordHash = bcrypt.hashSync(plain, SALT_ROUNDS)
   insertUser.run({ ...u, passwordHash })
 }
 
@@ -49,5 +71,5 @@ const counts = {
 console.log('✅ تمت التهيئة بنجاح:')
 console.log(`   الصيدليات: ${counts.pharmacies} | المستخدمون: ${counts.users} | المنتجات: ${counts.products}`)
 console.log('')
-console.log('👤 حسابات الدخول (وضع تجريبي - غيّر كلمات المرور في الإنتاج):')
-users.forEach(u => console.log(`   ${u.role.padEnd(12)} | ${u.username.padEnd(14)} | ${u.password}`))
+console.log('👤 حسابات الدخول (كلمات المرور في ملف الاعتمادات المحمي فقط — لا تُطبع هنا):')
+users.forEach(u => console.log(`   ${u.role.padEnd(12)} | ${u.username}`))

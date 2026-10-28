@@ -1,23 +1,31 @@
 #!/usr/bin/env bash
-# =============================================================
-# PHMP - تشغيل النفق (الدائم إن وُجد، وإلا نفق سريع مؤقت)
-# =============================================================
-CONFIG_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONFIG_FILE="$CONFIG_DIR/config.yml"
+# PHMP — تشغيل النفق الدائم (Cloudflare Tunnel) للخادم المحلي
+# المتطلب: CLOUDFLARE_TUNNEL_TOKEN في server/.env (600) — لا يُرفع أبداً.
+# البروتوكول http2 مُثبت على شبكة الهاتف (QUIC متذبذب/محجوب أحياناً).
+set -euo pipefail
 
-# التأكد من أن الخادم يعمل
-if ! curl -s http://localhost:3001/api/health > /dev/null 2>&1; then
-  echo "⚠️  الخادم المحلي لا يعمل. جارٍ تشغيله..."
-  cd "$CONFIG_DIR/.."
-  (npm start > /dev/null 2>&1 &)
-  sleep 3
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_DIR"
+
+TOKEN="$(grep -E '^CLOUDFLARE_TUNNEL_TOKEN=' server/.env | head -1 | sed 's/^CLOUDFLARE_TUNNEL_TOKEN=//; s/"$//')"
+if [[ -z "${TOKEN:-}" ]]; then
+  echo "❌ CLOUDFLARE_TUNNEL_TOKEN غير موجود في server/.env"
+  exit 1
 fi
 
-if [ -f "$CONFIG_FILE" ]; then
-  echo "🌐 تشغيل النفق الدائم (named tunnel)..."
-  exec cloudflared tunnel run --config "$CONFIG_FILE"
+command -v termux-wake-lock >/dev/null 2>&1 && termux-wake-lock || true
+
+# ثنائي النظام أولاً: نسخة npm القديمة (2026.10.1) تجمّدت بعد تهيئة ICMP بلا اتصالات.
+if [[ -x /usr/local/bin/cloudflared ]]; then
+  CLOUDFLARED=/usr/local/bin/cloudflared
 else
-  echo "🟠 لا يوجد نفق دائم مُعد (شغّل setup-tunnel.sh أولاً)"
-  echo "🌐 تشغيل نفق سريع مؤقت (العنوان يتغير عند كل إعادة تشغيل)..."
-  exec cloudflared tunnel --url http://localhost:3001 --no-autoupdate 2>&1 | tee "$CONFIG_DIR/quick-tunnel-url.txt" | grep --line-buffered -o 'https://[-a-z0-9]*\.trycloudflare\.com' | head -1
+  CLOUDFLARED="$(command -v cloudflared)"
 fi
+if [[ -z "${CLOUDFLARED:-}" ]]; then
+  echo "❌ cloudflared غير مثبت"
+  exit 1
+fi
+
+# منفذ metrics ثابت كي يتحقق الحارس من /ready (cloudflared يختار منفذاً عشوائياً بدونه).
+exec "$CLOUDFLARED" --protocol http2 --no-autoupdate \
+  --metrics 127.0.0.1:20244 tunnel run --token "$TOKEN"

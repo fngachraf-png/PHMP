@@ -9,7 +9,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = path.join(__dirname, '..', 'data')
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
 
-export const DB_PATH = path.join(DATA_DIR, 'phmp.db')
+export const DB_PATH = process.env.PHMP_DB_PATH
+  ? path.resolve(process.env.PHMP_DB_PATH)
+  : path.join(DATA_DIR, 'phmp.db')
 
 export const db = new Database(DB_PATH)
 db.pragma('journal_mode = WAL')

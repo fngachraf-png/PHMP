@@ -2,11 +2,17 @@
 // تعمل المنصة في وضعين:
 // 1. وضع محلي مستقل (localStorage) - افتراضي
 // 2. وضع متصل بالخادم المحلي (SQLite عبر النفق) - عند توفر الخادم
+//
+// ملاحظة أمنية: مفتاح API يُضمَّن في حزمة الواجهة عند البناء (VITE_PHMP_API_KEY)
+// أو يُدخَل يدوياً في الإعدادات ويُحفظ في localStorage. لأنه يصل إلى المتصفح
+// فهو حاجز ضد الفاحصين العشوائيين لا سرّ حقيقي؛ الحماية الفعلية للبيانات
+// الحساسة تبقى عبر JWT بعد ربط الدخول بالخادم.
 
-// عنوان الخادم المحلي - يُحدَّث تلقائياً من ملف الإعدادات أو يدوياً من صفحة الإعدادات
 const API_URL_KEY = 'pharmacare_api_url'
-// الافتراضي: نفق cloudflared المحلي للخادم (يُستبدل بعنوان النفق الدائم عند التنصيب)
-export const DEFAULT_API_URL = 'https://phmp-api.trycloudflare.com'
+const API_KEY_STORAGE = 'pharmacare_api_key'
+
+// النفق الدائم (Workers VPC → Cloudflare Tunnel → 127.0.0.1:3001)
+export const DEFAULT_API_URL = 'https://phmp-api.balbolghol-ai.workers.dev'
 
 export const getApiUrl = () => {
   try {
@@ -22,14 +28,32 @@ export const setApiUrl = (url) => {
   } catch { /* ignore */ }
 }
 
+export const getApiKey = () => {
+  try {
+    return localStorage.getItem(API_KEY_STORAGE) || import.meta.env.VITE_PHMP_API_KEY || ''
+  } catch {
+    return import.meta.env.VITE_PHMP_API_KEY || ''
+  }
+}
+
+export const setApiKey = (key) => {
+  try {
+    if (key) localStorage.setItem(API_KEY_STORAGE, key)
+    else localStorage.removeItem(API_KEY_STORAGE)
+  } catch { /* ignore */ }
+}
+
 const request = async (path, options = {}) => {
   const url = `${getApiUrl()}${path}`
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), options.timeout || 5000)
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
+  const key = getApiKey()
+  if (key) headers['x-phmp-key'] = key
   try {
     const res = await fetch(url, {
       ...options,
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      headers,
       signal: controller.signal,
     })
     clearTimeout(timeout)
