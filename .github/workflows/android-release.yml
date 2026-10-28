@@ -129,10 +129,26 @@ jobs:
 
       - name: ⚙️ ضخ إعدادات التوقيع في build.gradle
         run: |
+          # 1) إضافة كتلة signingConfigs داخل android { ... }
           sed -i 's/^android {$/android {\n    signingConfigs {\n        release {\n            storeFile file("release.keystore")\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }/' android/app/build.gradle
-          sed -i 's/^        release {$/        release {\n            signingConfig signingConfigs.release/' android/app/build.gradle
-          echo "--- signing config (verification) ---"
-          grep -A 10 'signingConfigs' android/app/build.gradle | head -13 || exit 1
+
+          # 2) إدراج signingConfig داخل buildTypes { release { ... } } فقط
+          #    (awk يضمن عدم اللمس الساذج لكتلة signingConfigs التي تحمل نفس المسافة البادئة)
+          awk '
+            /buildTypes \{/ { inbuild = 1 }
+            inbuild && /^        release \{/ && !done {
+              print
+              print "            signingConfig signingConfigs.release"
+              done = 1
+              next
+            }
+            { print }
+          ' android/app/build.gradle > build_gradle.tmp && mv build_gradle.tmp android/app/build.gradle
+
+          echo "--- signing configs (verification) ---"
+          grep -A 8 'signingConfigs' android/app/build.gradle | head -10
+          echo "--- buildTypes (verification) ---"
+          grep -A 4 'buildTypes' android/app/build.gradle | head -6
 
       - name: 🔨 بناء APK الموقّع
         working-directory: android
