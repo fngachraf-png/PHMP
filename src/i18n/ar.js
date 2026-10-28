@@ -249,6 +249,19 @@ export const ar = {
   allRightsReserved: 'جميع الحقوق محفوظة',
   developedBy: 'تطوير بواسطة',
 
+  // ===== الصفحات العامة والتنقل العام =====
+  staffLoginBtn: 'دخول الموظفين',
+  customerAccountSubtitle: 'سجّل حساباً مشتركاً أو تابع كزبون عابر',
+  aboutUs: 'من نحن',
+  howToUse: 'دليل الاستخدام',
+  termsOfUse: 'شروط الاستخدام',
+  privacyPolicy: 'سياسة الخصوصية',
+  quickLinks: 'روابط سريعة',
+  legalPages: 'الصفحات القانونية',
+  staffAccess: 'فضاء الموظفين',
+  footerMission: 'منصة مغربية لربط الزبناء بالصيدليات المعتمدة: اطلب دواءك بثقة وأمان.',
+  footerLegalNote: 'المنصة وسيط تقني بين الزبون والصيدلية — صرف الأدوية يبقى خاضعاً للقانون 17.04',
+
   // Extended categories
   gastro: 'الجهاز الهضمي',
   neuro: 'الجهاز العصبي',
@@ -284,6 +297,7 @@ export const ar = {
   continueAsGuest: 'المتابعة كزبون عابر',
   guestNote: 'بدون تسجيل — أدخل اسمك ورقم هاتفك فقط',
   memberLogin: 'دخول الزبون المشترك',
+  switchIdentity: 'تغيير هوية الزبون',
   memberRegister: 'تسجيل حساب جديد',
   haveAccount: 'لدي حساب بالفعل',
   noAccount: 'ليس لدي حساب',

@@ -250,6 +250,19 @@ export const en = {
   allRightsReserved: 'All rights reserved',
   developedBy: 'Developed by',
 
+  // ===== Public pages & navigation =====
+  staffLoginBtn: 'Staff Login',
+  customerAccountSubtitle: 'Create a member account or continue as guest',
+  aboutUs: 'About Us',
+  howToUse: 'How to Use',
+  termsOfUse: 'Terms of Use',
+  privacyPolicy: 'Privacy Policy',
+  quickLinks: 'Quick Links',
+  legalPages: 'Legal Pages',
+  staffAccess: 'Staff Access',
+  footerMission: 'A Moroccan platform connecting customers with licensed pharmacies: order your medicine with confidence.',
+  footerLegalNote: 'The platform is a technical intermediary — medicine dispensing remains governed by Law 17.04',
+
   // Extended categories
   gastro: 'Gastroenterology',
   neuro: 'Neurology',
@@ -285,6 +298,7 @@ export const en = {
   continueAsGuest: 'Continue as guest',
   guestNote: 'No registration — just enter your name and phone number',
   memberLogin: 'Registered customer login',
+  switchIdentity: 'Switch customer identity',
   memberRegister: 'Create a new account',
   haveAccount: 'I already have an account',
   noAccount: "I don't have an account",

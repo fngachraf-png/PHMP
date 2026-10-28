@@ -249,6 +249,19 @@ export const fr = {
   allRightsReserved: 'Tous droits réservés',
   developedBy: 'Développé par',
 
+  // ===== Pages publiques et navigation =====
+  staffLoginBtn: 'Espace personnel',
+  customerAccountSubtitle: 'Créez un compte membre ou continuez en invité',
+  aboutUs: 'À propos',
+  howToUse: "Guide d'utilisation",
+  termsOfUse: "Conditions d'utilisation",
+  privacyPolicy: 'Politique de confidentialité',
+  quickLinks: 'Liens rapides',
+  legalPages: 'Pages légales',
+  staffAccess: 'Accès personnel',
+  footerMission: 'Une plateforme marocaine reliant les clients aux pharmacies agréées : commandez vos médicaments en toute confiance.',
+  footerLegalNote: 'La plateforme est un intermédiaire technique — la délivrance des médicaments reste soumise à la loi 17.04',
+
   // Extended categories
   gastro: 'Gastro-entérologie',
   neuro: 'Neurologie',
@@ -284,6 +297,7 @@ export const fr = {
   continueAsGuest: 'Continuer sans inscription',
   guestNote: 'Sans inscription — saisissez simplement votre nom et téléphone',
   memberLogin: 'Connexion client inscrit',
+  switchIdentity: "Changer l'identité du client",
   memberRegister: 'Créer un nouveau compte',
   haveAccount: 'J\'ai déjà un compte',
   noAccount: 'Je n\'ai pas de compte',

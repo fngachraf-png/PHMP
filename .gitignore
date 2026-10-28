@@ -66,3 +66,4 @@ server/server.log
 *.db-wal
 *.db-shm
 quick-tunnel-url.txt
+.vercel

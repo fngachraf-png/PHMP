@@ -15,6 +15,10 @@ import Platform from './pages/Platform'
 import Legal from './pages/Legal'
 import Shop from './pages/Shop'
 import LiveOrders from './pages/LiveOrders'
+import About from './pages/About'
+import Guide from './pages/Guide'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 
 const ProtectedRoute = ({ children, permission }) => {
   const { currentUser, hasPermission } = useApp()
@@ -42,6 +46,12 @@ function AppRoutes() {
       {/* واجهة الزبون لشراء الدواء — متاحة للعموم بدون تسجيل موظفين */}
       <Route path="/shop" element={<Shop />} />
       <Route path="/shop/:pharmacyId" element={<Shop />} />
+
+      {/* الصفحات العامة: من نحن / دليل الاستخدام / الشروط / الخصوصية */}
+      <Route path="/about" element={<About />} />
+      <Route path="/guide" element={<Guide />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
 
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/platform" element={<ProtectedRoute permission="platform.manage"><Platform /></ProtectedRoute>} />

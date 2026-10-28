@@ -1,12 +1,15 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import CheckoutModal from '../components/CheckoutModal'
+import CustomerAccountModal from '../components/CustomerAccountModal'
 import OrderTracking from '../components/OrderTracking'
 import {
   Stethoscope, Store, MapPin, Phone, Search, ShoppingCart, Trash2, Plus, Minus,
   ArrowRight, ArrowLeft, PackageSearch, ClipboardList, LogOut, X, BadgeCheck,
-  ShieldCheck, Truck, Stethoscope as StethoscopeIcon, Lock
+  ShieldCheck, Truck, Stethoscope as StethoscopeIcon, Lock, UserRound,
+  Info, BookOpen, FileText
 } from 'lucide-react'
 
 // =====================================================================
@@ -35,6 +38,7 @@ const Shop = () => {
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [activeOrderId, setActiveOrderId] = useState(null)
   const [myOrdersOpen, setMyOrdersOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [toast, setToast] = useState('')
 
   const pharmacy = pharmaciesData.find(p => p.id === pharmacyId)
@@ -280,7 +284,15 @@ const Shop = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            {currentCustomer && (
+            {/* دخول الموظفين (مدير / صيدلاني / كاشير / محاسب / مالك المنصة) */}
+            <Link to="/login" title={t('staffLoginBtn')}
+              className="relative p-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition-colors shadow-md"
+              aria-label={t('staffLoginBtn')}>
+              <Lock className="w-5 h-5" />
+            </Link>
+
+            {/* حساب الزبون: تسجيل / دخول — أو شارة الجلسة الحالية */}
+            {currentCustomer ? (
               <div className="hidden sm:flex items-center gap-2 text-xs bg-gray-100 rounded-full px-3 py-1.5">
                 <span>{currentCustomer.type === 'member' ? '👤' : '👋'}</span>
                 <span className="font-medium text-gray-700 max-w-[120px] truncate">{currentCustomer.fullName}</span>
@@ -288,6 +300,13 @@ const Shop = () => {
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
               </div>
+            ) : (
+              <button onClick={() => setAccountOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white border border-gray-200 hover:border-primary-300 hover:bg-primary-50 text-sm font-semibold text-gray-700 transition-all"
+                aria-label={t('myAccount')}>
+                <UserRound className="w-5 h-5 text-primary-600" />
+                <span className="hidden md:inline">{t('myAccount')}</span>
+              </button>
             )}
 
             {myOrders.length > 0 && (
@@ -409,6 +428,12 @@ const Shop = () => {
         </div>
       )}
 
+      {/* ===== نافذة حساب الزبون (تسجيل/دخول) ===== */}
+      <CustomerAccountModal
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+      />
+
       {/* ===== إتمام الطلب ===== */}
       <CheckoutModal
         open={checkoutOpen}
@@ -456,11 +481,43 @@ const Shop = () => {
       )}
 
       {/* تذييل */}
-      <footer className="border-t border-gray-200 py-6 text-center text-xs text-gray-400 px-4 safe-bottom">
-        <p className="flex items-center justify-center gap-1.5">
-          <ShieldCheck className="w-3.5 h-3.5" /> {t('directConnectionNote')}
-        </p>
-        <p className="mt-1.5">© {new Date().getFullYear()} {t('appName')} — {t('allRightsReserved')}</p>
+      <footer className="border-t border-gray-200 bg-gray-50/50">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-sm">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <ShieldCheck className="w-4 h-4 text-primary-600" />
+                <span className="font-bold text-gray-900">{t('appName')}</span>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">{t('footerMission')}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 mb-2 text-xs uppercase tracking-wider">{t('quickLinks')}</p>
+              <div className="flex flex-col gap-1.5">
+                <Link to="/about" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><Info className="w-3.5 h-3.5" /> {t('aboutUs')}</Link>
+                <Link to="/guide" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><BookOpen className="w-3.5 h-3.5" /> {t('howToUse')}</Link>
+              </div>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 mb-2 text-xs uppercase tracking-wider">{t('legalPages')}</p>
+              <div className="flex flex-col gap-1.5">
+                <Link to="/terms" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><FileText className="w-3.5 h-3.5" /> {t('termsOfUse')}</Link>
+                <Link to="/privacy" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><ShieldCheck className="w-3.5 h-3.5" /> {t('privacyPolicy')}</Link>
+              </div>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 mb-2 text-xs uppercase tracking-wider">{t('staffAccess')}</p>
+              <Link to="/login" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors">
+                <Lock className="w-3.5 h-3.5" /> {t('staffLoginBtn')}
+              </Link>
+              <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">{t('footerLegalNote')}</p>
+            </div>
+          </div>
+          <p className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-xs text-gray-400">
+            <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> {t('directConnectionNote')}</span>
+            <span>• © {new Date().getFullYear()} {t('appName')} — {t('allRightsReserved')}</span>
+          </p>
+        </div>
       </footer>
     </div>
   )

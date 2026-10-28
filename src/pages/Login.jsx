@@ -305,6 +305,15 @@ const Login = () => {
               </button>
             </div>
           </div>
+
+          {/* روابط الصفحات العامة */}
+          <div className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-400">
+            <Link to="/shop" className="hover:text-primary-600 transition-colors">{t('shopTitle')}</Link>
+            <Link to="/about" className="hover:text-primary-600 transition-colors">{t('aboutUs')}</Link>
+            <Link to="/guide" className="hover:text-primary-600 transition-colors">{t('howToUse')}</Link>
+            <Link to="/terms" className="hover:text-primary-600 transition-colors">{t('termsOfUse')}</Link>
+            <Link to="/privacy" className="hover:text-primary-600 transition-colors">{t('privacyPolicy')}</Link>
+          </div>
         </div>
       </div>
     </div>

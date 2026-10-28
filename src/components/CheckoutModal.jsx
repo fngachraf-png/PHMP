@@ -129,7 +129,28 @@ const CheckoutModal = ({ open, onClose, cart, subtotal, hasRxItems, pharmacy, on
           {/* ===== الخطوة 1: الهوية ===== */}
           {step === 1 && (
             <>
-              {identityMode === 'choose' ? (
+              {identityMode === 'choose' && currentCustomer ? (
+                /* زبون مسجل الدخول مسبقاً (من نافذة حسابي) — تخطي الهوية */
+                <div className="space-y-3">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+                    <p className="text-sm text-emerald-700">{t('welcomeBack')}</p>
+                    <p className="font-bold text-gray-900 mt-1">
+                      {currentCustomer.fullName}
+                      <span className={`ms-2 text-[10px] px-1.5 py-0.5 rounded-full ${currentCustomer.type === 'member' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>
+                        {currentCustomer.type === 'member' ? t('memberBadge') : t('guestBadge')}
+                      </span>
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5" dir="ltr">{currentCustomer.phone}</p>
+                  </div>
+                  <button onClick={() => setStep(hasRxItems ? 2 : 3)} className="btn-primary w-full py-3">
+                    {t('next')} <Arrow className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setIdentityMode('switch')}
+                    className="w-full text-xs text-gray-500 hover:text-primary-600 py-1">
+                    {t('switchIdentity')}
+                  </button>
+                </div>
+              ) : (identityMode === 'choose' || identityMode === 'switch') ? (
                 <div className="space-y-3">
                   <button onClick={() => setIdentityMode('guest')}
                     className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-primary-400 hover:bg-primary-50 text-start transition-all">
