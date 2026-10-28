@@ -202,8 +202,9 @@ Testing (من عناوين عامة، لا localhost):
 - نسخة احتياطية: 98KB، 9 جداول، `quick_check=ok`.
 
 Deployment:
+- Commit: `66b4050` → `main`.
 - GitHub Actions: تحديث أسرار `CLOUDFLARE_API_TOKEN` و`CLOUDFLARE_ACCOUNT_ID` (التوكن القديم كان يعيد 9109).
-- Cloudflare Pages: بانتظار اكتمال البناء والتحقق من https://phmp.pages.dev.
+- Cloudflare Pages: نجح البناء (run `40785185261`) — https://phmp.pages.dev و`/shop` يعيدان 200، والحزمة المنشورة تحتوي العنوان الثابت وحقل المفتاح **دون** المفتاح نفسه.
 - Vercel: يبقى v1.2.0 حتى توفير رمز Vercel.
 
 Stage Summary:
