@@ -190,14 +190,24 @@ jobs:
 
             **التوقيع**: CN=TARIK CHOUIKA (شهادة صلاحيتها 30 سنة)
 
-            ## ⬇️ التحميل المباشر (دائم - يحمل آخر إصدار دائماً)
+            ## ⬇️ التحميل المباشر العام (دائم — يحمل دائماً أحدث إصدار)
             ```
-            https://github.com/fngachraf-png/PHMP/releases/latest/download/PharmaCare-Pro.apk
+            https://phmp-download.pages.dev/PharmaCare-Pro.apk
             ```
 
+            > رابط GitHub (لأعضاء المستودع):
+            > `https://github.com/fngachraf-png/PHMP/releases/latest/download/PharmaCare-Pro.apk`
+
             ## ✨ مستجدات هذا الإصدار
+            - 🇫🇷 اللغة الفرنسية كاملة (عربي / فرنسي / إنجليزي)
+            - 🛒 واجهة الزبون: اختيار الصيدلية وطلب الدواء
+            - 👤 زبون عابر أو مشترك (تسجيل بالاسم + الهاتف + صورة وثيقة الهوية)
+            - ⚕️ إرفاق صورة الوصفة الطبية إلزامياً للأدوية المقيدة
+            - 🚚 خيارات التوصيل (بنفسه أو عبر الصيدلية — المصاريف على الزبون)
+            - 🔗 اتصال مباشر زبون ↔ كاشير/صيدلاني عبر المنصة (بدون تسجيل في الخادم)
+            - 🧾 فاتورة طباعة: اسم الصيدلية + الدواء + السعر + طريقة الدفع
+            - 📱 ملء الشاشة 100% وإخفاء أشرطة نظام أندرويد (Immersive)
             - نظام صلاحيات متكامل: مالك المنصة / مدير / محاسب / صيدلاني / كاشير
-            - توافق كامل مع الهواتف والحواسيب
             - المراجع القانونية واللوائح المغربية للأدوية (AMMPS / وزارة الصحة)
             - دعم المزامنة مع قاعدة البيانات المحلية SQLite عبر النفق الدائم
 
@@ -209,3 +219,48 @@ jobs:
             PharmaCare-Pro.apk
             PharmaCare-Pro.apk.sha256
           make_latest: true
+
+      # =====================================================================
+      # نشر APK على Cloudflare Pages (رابط عام دائم — المستودع خاص فرابط
+      # releases/latest يطلب توثيقاً؛ هذا الرابط عام لكل الزبناء دائماً)
+      # =====================================================================
+      - name: 🌐 نشر رابط التحميل العام الدائم (Cloudflare Pages)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p apk-public
+          cp PharmaCare-Pro.apk apk-public/
+          cp PharmaCare-Pro.apk.sha256 apk-public/ 2>/dev/null || true
+          cat > apk-public/index.html << 'HTML'
+          <!doctype html>
+          <html lang="ar" dir="rtl">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>PharmaCare Pro — تحميل التطبيق</title>
+            <style>
+              body { font-family: system-ui, 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg,#ecfdf5,#d1fae5); min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
+              .card { background: #fff; border-radius: 24px; box-shadow: 0 20px 50px rgba(5,150,105,.25); padding: 40px; text-align: center; max-width: 420px; }
+              .logo { width: 72px; height: 72px; border-radius: 20px; background: linear-gradient(135deg,#10b981,#047857); display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 16px; }
+              h1 { color: #065f46; font-size: 22px; margin: 0 0 6px; }
+              p { color: #4b5563; font-size: 14px; margin: 4px 0 18px; }
+              a.btn { display: inline-block; background: #059669; color: #fff; text-decoration: none; font-weight: 700; padding: 14px 32px; border-radius: 14px; font-size: 16px; box-shadow: 0 8px 20px rgba(5,150,105,.35); }
+              a.btn:active { transform: scale(.97); }
+              small { color: #9ca3af; display: block; margin-top: 14px; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <div class="logo">💊</div>
+              <h1>PharmaCare Pro — PHMP</h1>
+              <p>تطبيق إدارة الصيدليات وشراء الدواء<br/>وقّع بشهادة CN=TARIK CHOUIKA (30 سنة)</p>
+              <a class="btn" href="/PharmaCare-Pro.apk">⬇️ تحميل آخر إصدار (APK)</a>
+              <small>هذا الرابط يقدم دائماً أحدث إصدار تلقائياً</small>
+            </div>
+          </body>
+          </html>
+          HTML
+          npx --yes wrangler@3 pages project create phmp-download --production-branch main 2>/dev/null || echo "ℹ️ المشروع موجود مسبقاً"
+          npx --yes wrangler@3 pages deploy apk-public --project-name=phmp-download --branch=main --commit-dirty=true
+          echo "🌐 الرابط العام الدائم: https://phmp-download.pages.dev/PharmaCare-Pro.apk"
