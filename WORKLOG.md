@@ -148,7 +148,12 @@ Testing (متصفح تفاعلي كامل):
 - ✅ الصفحات العامة الأربع تعمل + تبديل اللغات (ar RTL / fr / en LTR)
 
 Deployment:
-- الإصدار: v1.3.0 — انظر CHANGELOG.md
+- Commit 623158f → GitHub main (18 ملفاً، +1590 سطراً)
+- Cloudflare Pages: سير العمل اكتمل بنجاح ✅ → https://phmp.pages.dev (v1.3.0)
+  * التحقق: /about تعمل (200) والرمز الجديد موجود في الحزمة المنشورة
+- Android Release: سير العمل انطلق تلقائياً لبناء APK v1.3.0 موقّع
+- Vercel: الرمز (vcp_) غير متوفر في هذه الجلسة — يبقى على v1.2.0 مؤقتاً؛
+  عند توفر الرمز: `cd repo && npm run build && VERCEL_TOKEN=... node ../scripts/vercel-deploy.mjs`
 
 Stage Summary:
 - كل مطالب المالك منجزة: مدخل دخول ظاهر + اشتراك الزبون واضح + صفحات
