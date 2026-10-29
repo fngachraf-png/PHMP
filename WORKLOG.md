@@ -340,9 +340,12 @@ Testing (سكربت Playwright واحد يشغّل الخادم الحقيقي +
 - دخول superadmin كامل عبر الخادم الحقيقي → /platform ← صفر أخطاء كونسول في كل السيناريوهات.
 
 Deployment:
-- Commit مع هذا التحديث → GitHub `main` (Cloudflare Pages يبني تلقائياً).
-- سير android-release ينطلق تلقائياً (تغيير capacitor.config.json + src/**) → APK جديد بـCapacitorHttp مفعّل → الرابط الدائم https://phmp-download.pages.dev/PharmaCare-Pro.apk
-- Vercel: نشر يدوي عبر `scripts/vercel-deploy.mjs` برمز المالك (القناة المعتمدة).
+- Commit `b2e8d77` → GitHub `main`.
+- Cloudflare Pages: بناء تلقائي نجح (run على b2e8d77) — https://phmp.pages.dev يقدم بصمة v1.6.1 (`index-D1s7Sn3M.js`) و`/login` تعيد 200.
+- Vercel (برمز المالك — لا يُكتب في المستودع): نشر إنتاجي `dpl_AQQSQ7ZmU2nymSmUCYJvEM3Q4f`:
+  * https://phmplatform.vercel.app وhttps://pharmacare-pro-jade.vercel.app تتبعان أحدث نشر — كلاهما يقدم `index-D1s7Sn3M.js` و`/login` تعيد 200.
+  * **إصلاح أثناء النشر**: `pharmacare-pro-jade.vercel.app` كان يعرض 302 (Protected by Vercel Authentication) — الحماية `all_except_custom_domains` تعفي نطاقات المشروع فقط، وكان النطاق مجرد alias مرتبط بنشر واحد. أُضيف إلى نطاقات مشروع `phmp` عبر API (verified: true) فعاد عاماً 200.
+- سير android-release انطلق تلقائياً على b2e8d77 (تغيير capacitor.config.json + src/**) → APK جديد بـCapacitorHttp مفعّل → الرابط الدائم https://phmp-download.pages.dev/PharmaCare-Pro.apk
 - ⚠️ **للمساعد المحلي (إلزامي)**: هذا الإصدار يتضمن تغييراً في `server/src/index.js` — نفّذ `git pull` ثم `phmp-guard.sh restart` حتى يعمل دخول الأندرويد مع النسخ المثبتة حالياً (قبل بناء APK الجديد).
 
 Stage Summary:
