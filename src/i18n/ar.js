@@ -46,7 +46,7 @@ export const ar = {
 
   // Auth
   login: 'تسجيل الدخول',
-  loginSubtitle: 'اختر صيدليتك وأدخل بياناتك للمتابعة',
+  loginSubtitle: 'أدخل بيانات حسابك الرسمي للمتابعة',
   username: 'اسم المستخدم',
   password: 'كلمة المرور',
   selectPharmacy: 'اختر الصيدلية',
@@ -59,6 +59,10 @@ export const ar = {
   allPharmacies: 'كل الصيدليات',
   accountSuspended: 'هذا الحساب موقوف. تواصل مع مالك المنصة.',
   invalidCredentials: 'بيانات الدخول غير صحيحة',
+  loginServerUnreachable: 'تعذّر الوصول إلى خادم المنصة. تحقق من اتصالك بالإنترنت أو من حالة الخادم المحلي ثم أعد المحاولة.',
+  serverChecking: 'جارٍ فحص الاتصال بالخادم...',
+  loginRealAccountsNote: 'الدخول بحسابات الموظفين الرسمية — يستوجب اتصالاً بخادم المنصة',
+  downloadApp: 'تحميل التطبيق',
 
   // Navigation
   dashboard: 'لوحة التحكم',

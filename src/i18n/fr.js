@@ -46,7 +46,7 @@ export const fr = {
 
   // Auth
   login: 'Connexion',
-  loginSubtitle: 'Sélectionnez votre pharmacie et saisissez vos identifiants',
+  loginSubtitle: 'Saisissez les identifiants de votre compte officiel pour continuer',
   username: "Nom d'utilisateur",
   password: 'Mot de passe',
   selectPharmacy: 'Sélectionner la pharmacie',
@@ -59,6 +59,10 @@ export const fr = {
   allPharmacies: 'Toutes les pharmacies',
   accountSuspended: 'Ce compte est suspendu. Contactez le propriétaire de la plateforme.',
   invalidCredentials: 'Identifiants incorrects',
+  loginServerUnreachable: 'Impossible de joindre le serveur de la plateforme. Vérifiez votre connexion ou l\u2019état du serveur local, puis réessayez.',
+  serverChecking: 'Vérification de la connexion au serveur...',
+  loginRealAccountsNote: 'Connexion avec les comptes officiels du personnel — nécessite une connexion au serveur',
+  downloadApp: 'Télécharger l\u2019application',
 
   // Navigation
   dashboard: 'Tableau de bord',

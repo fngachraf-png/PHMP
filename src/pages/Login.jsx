@@ -1,67 +1,71 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
-import { Stethoscope, Lock, User as UserIcon, Building2, Eye, EyeOff, ShieldCheck, Pill, Sparkles, ShoppingBag } from 'lucide-react'
+import { api } from '../lib/api'
+import { Stethoscope, Lock, User as UserIcon, Eye, EyeOff, ShieldCheck, Pill, Sparkles, Building2, ShoppingBag, Wifi, WifiOff, Loader2 } from 'lucide-react'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 
+// صفحة دخول الموظفين — المصادقة عبر الخادم المحلي (SQLite + JWT + bcrypt)
+// الحسابات التجريبية أُزيلت: الدخول متاح فقط بحسابات رسمية أنشأها مالك المنصة.
 const Login = () => {
-  const { t, language, login, pharmacies, users, isRTL, pickName } = useApp()
-  const [selectedPharmacy, setSelectedPharmacy] = useState('ph1')
+  const { t, language, login, isRTL, importServerUsers, importServerPharmacies } = useApp()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [serverCheck, setServerCheck] = useState('checking') // checking | online | offline
 
   const L = (ar, fr, en) => language === 'ar' ? ar : language === 'fr' ? fr : en
 
-  // منطق الدخول الفعلي - يستقبل القيم مباشرة لتفادي الإغلاق القديم (stale closure)
-  const doLogin = (u, p, pharmacyId) => {
-    setError('')
-    setLoading(true)
-    setTimeout(() => {
-      const user = users.find(x => x.username === u && x.password === p)
-      const pharmacy = pharmacies.find(ph => ph.id === (pharmacyId || selectedPharmacy))
+  // فحص اتصال الخادم عند فتح الصفحة (مؤشر واضح قبل محاولة الدخول)
+  useEffect(() => {
+    let alive = true
+    api.checkHealth().then((online) => {
+      if (alive) setServerCheck(online ? 'online' : 'offline')
+    })
+    return () => { alive = false }
+  }, [])
 
-      if (user) {
-        if (user.active === false) {
-          setError(t('accountSuspended'))
-          setLoading(false)
-          return
-        }
-        // السوبر أدمين (مالك المنصة) لا يرتبط بصيدلية محددة
-        if (user.role === 'super_admin') {
-          login(user, null)
-        } else {
-          login(user, pharmacy || pharmacies.find(ph => ph.id === user.pharmacyId))
-        }
-      } else {
-        setError(t('invalidCredentials'))
-      }
-      setLoading(false)
-    }, 600)
-  }
-
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e?.preventDefault()
-    doLogin(username, password)
-  }
-
-  const quickLogin = (role) => {
-    const credentials = {
-      super_admin: { username: 'superadmin', password: 'super123' },
-      admin: { username: 'admin', password: 'admin' },
-      accountant: { username: 'accountant', password: 'account' },
-      pharmacist: { username: 'pharmacist', password: 'pharma' },
-      cashier: { username: 'cashier', password: 'cashier' },
+    setError('')
+    if (!username.trim() || !password) {
+      setError(L('يرجى إدخال اسم المستخدم وكلمة المرور', 'Veuillez saisir votre nom d\u2019utilisateur et votre mot de passe', 'Please enter your username and password'))
+      return
     }
-    const cred = credentials[role]
-    setUsername(cred.username)
-    setPassword(cred.password)
-    // اختيار الصيدلية المناسبة تلقائياً
-    const user = users.find(u => u.username === cred.username)
-    if (user?.pharmacyId) setSelectedPharmacy(user.pharmacyId)
-    doLogin(cred.username, cred.password, user?.pharmacyId)
+    setLoading(true)
+    try {
+      // المصادقة عبر الخادم المحلي (الحسابات الرسمية — كلمات مرور مشفرة bcrypt)
+      const data = await api.login(username.trim(), password)
+      const serverUser = { ...data.user, active: true }
+      const serverPharmacy = data.pharmacy || null
+
+      // تسجيل الجلسة محلياً (التوجيه تلقائي حسب الدور عبر ProtectedRoute)
+      login(serverUser, serverPharmacy)
+
+      // مزامنة مستخدمي وصيدليات الخادم إلى الواجهة (المصدر الموثوق)
+      // — تُزيل بذلك أي بقايا لحسابات العرض التجريبي
+      try {
+        const [serverUsers, serverPharmacies] = await Promise.all([
+          ['super_admin', 'admin'].includes(serverUser.role) ? api.fetchUsers() : Promise.resolve(null),
+          api.fetchPharmacies(),
+        ])
+        if (serverUsers) importServerUsers(serverUsers)
+        if (serverPharmacies) importServerPharmacies(serverPharmacies)
+      } catch { /* الجلسة مسجلة — التحديثات الإضافية غير حرجة */ }
+    } catch (err) {
+      // الخادم ردّ بخطأ (بيانات خاطئة / حساب موقوف / محاولات كثيرة)
+      if (err?.serverResponded) {
+        setError(err.message || t('invalidCredentials'))
+      } else {
+        // تعذّر الوصول للخادم (شبكة/نفق) — لا سقوط على حسابات تجريبية
+        setError(t('loginServerUnreachable'))
+        setServerCheck('offline')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -159,28 +163,27 @@ const Login = () => {
           </div>
 
           <h2 className="text-2xl font-bold text-gray-900 mb-1">{t('staffEntrance')}</h2>
-          <p className="text-sm text-gray-600 mb-6">{t('loginSubtitle')}</p>
+          <p className="text-sm text-gray-600 mb-4">{t('loginSubtitle')}</p>
+
+          {/* مؤشر حالة الخادم — الدخول يستوجب اتصالاً بخادم المنصة */}
+          <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg mb-5 ${
+            serverCheck === 'online' ? 'bg-emerald-50 text-emerald-700'
+            : serverCheck === 'offline' ? 'bg-red-50 text-red-600'
+            : 'bg-gray-100 text-gray-500'
+          }`}>
+            {serverCheck === 'checking' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {serverCheck === 'online' && <Wifi className="w-3.5 h-3.5" />}
+            {serverCheck === 'offline' && <WifiOff className="w-3.5 h-3.5" />}
+            <span className="font-medium">
+              {serverCheck === 'checking' ? t('serverChecking')
+                : serverCheck === 'online' ? t('serverOnline')
+                : t('serverOffline')}
+            </span>
+            {serverCheck === 'online' && <span className="text-emerald-600/70">•</span>}
+            {serverCheck === 'online' && <span>{t('loginRealAccountsNote')}</span>}
+          </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
-            {/* Pharmacy selection */}
-            <div>
-              <label className="label flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-primary-600" />
-                {t('selectPharmacy')}
-              </label>
-              <select
-                value={selectedPharmacy}
-                onChange={(e) => setSelectedPharmacy(e.target.value)}
-                className="input"
-              >
-                {pharmacies.map(ph => (
-                  <option key={ph.id} value={ph.id}>
-                    {ph.logo} {pickName(ph)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {/* Username */}
             <div>
               <label className="label flex items-center gap-2">
@@ -193,8 +196,10 @@ const Login = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="input ps-10"
-                  placeholder="admin"
+                  placeholder={L('اسم المستخدم الرسمي', 'Nom d\u2019utilisateur officiel', 'Official username')}
                   autoComplete="username"
+                  dir="ltr"
+                  autoFocus
                 />
                 <UserIcon className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-3' : 'left-3'} w-4 h-4 text-gray-400`} />
               </div>
@@ -257,58 +262,10 @@ const Login = () => {
             {t('customerEntrance')} — {t('shopTitle')}
           </Link>
 
-          {/* Demo accounts */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              {t('demoAccounts')}
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => quickLogin('super_admin')}
-                className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gradient-to-br from-violet-50 to-violet-100 hover:from-violet-100 hover:to-violet-200 transition-all border border-violet-200"
-              >
-                <span className="text-2xl">👑</span>
-                <span className="text-xs font-semibold text-violet-800 text-center leading-tight">{t('loginAsSuperAdmin')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => quickLogin('admin')}
-                className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gradient-to-br from-primary-50 to-primary-100 hover:from-primary-100 hover:to-primary-200 transition-all border border-primary-200"
-              >
-                <span className="text-2xl">👨‍⚕️</span>
-                <span className="text-xs font-semibold text-primary-800">{t('loginAsAdmin')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => quickLogin('accountant')}
-                className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200 transition-all border border-amber-200"
-              >
-                <span className="text-2xl">📊</span>
-                <span className="text-xs font-semibold text-amber-800">{t('loginAsAccountant')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => quickLogin('pharmacist')}
-                className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 transition-all border border-blue-200"
-              >
-                <span className="text-2xl">👩‍⚕️</span>
-                <span className="text-xs font-semibold text-blue-800">{t('loginAsPharmacist')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => quickLogin('cashier')}
-                className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 transition-all border border-gray-200"
-              >
-                <span className="text-2xl">🧑‍💼</span>
-                <span className="text-xs font-semibold text-gray-800">{t('loginAsCashier')}</span>
-              </button>
-            </div>
-          </div>
-
           {/* روابط الصفحات العامة */}
           <div className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-400">
             <Link to="/shop" className="hover:text-primary-600 transition-colors">{t('shopTitle')}</Link>
+            <Link to="/download" className="hover:text-primary-600 transition-colors">{t('downloadApp')}</Link>
             <Link to="/about" className="hover:text-primary-600 transition-colors">{t('aboutUs')}</Link>
             <Link to="/guide" className="hover:text-primary-600 transition-colors">{t('howToUse')}</Link>
             <Link to="/terms" className="hover:text-primary-600 transition-colors">{t('termsOfUse')}</Link>

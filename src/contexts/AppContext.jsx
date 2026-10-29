@@ -164,6 +164,8 @@ export const AppProvider = ({ children }) => {
     if (currentUser) {
       logAudit('logout')
     }
+    // مسح رمز جلسة الخادم (JWT) — لا يبقى أي أثر للجلسة
+    api.logout()
     setCurrentUser(null)
     setCurrentPharmacy(null)
     setActivePharmacyId(null)
@@ -182,33 +184,84 @@ export const AppProvider = ({ children }) => {
   }
 
   // ===== إدارة المستخدمين (سوبر أدمين: الكل / أدمن: صيدليته) =====
-  const addUser = (user) => {
+  // عند الاتصال بالخادم المحلي: كل عملية تُنفَّذ أولاً على SQLite (المصدر الموثوق)
+  // ثم تُعكس محلياً. عند انقطاع الخادم تُنفَّذ محلياً فقط (وضع مستقل).
+  const addUser = async (user) => {
     if (!hasPermission('users.manage')) return null
-    const newUser = {
+    let newUser = {
       ...user,
       id: `u${Date.now()}`,
       active: user.active !== false,
     }
-    setUsersData((prev) => [newUser, ...prev])
-    logAudit('user_add', { username: newUser.username, role: newUser.role, pharmacyId: newUser.pharmacyId })
-    return newUser
+    // إنشاء على الخادم عند الاتصال (الخادم يولّد المعرف ويُعيد كلمة المرور مشفرة)
+    if (serverStatus.online) {
+      try {
+        const created = await api.createUser({
+          username: user.username, password: user.password, name: user.name,
+          nameEn: user.nameEn || '', role: user.role, pharmacyId: user.pharmacyId || null,
+          avatar: user.avatar || '👤',
+        })
+        if (created?.id) newUser = { ...newUser, id: created.id, password: undefined }
+      } catch (err) {
+        throw err // إظهار خطأ الخادم للمستخدم (مثلاً: اسم مستعمل من قبل)
+      }
+    }
+    const { password, ...safeUser } = newUser
+    setUsersData((prev) => [safeUser, ...prev])
+    logAudit('user_add', { username: safeUser.username, role: safeUser.role, pharmacyId: safeUser.pharmacyId })
+    return safeUser
   }
 
-  const updateUser = (id, updates) => {
+  const updateUser = async (id, updates) => {
     if (!hasPermission('users.manage')) return
-    setUsersData((prev) => prev.map(u => u.id === id ? { ...u, ...updates } : u))
+    if (serverStatus.online) {
+      try {
+        const payload = {}
+        if (updates.name !== undefined) payload.name = updates.name
+        if (updates.role !== undefined) payload.role = updates.role
+        if (updates.pharmacyId !== undefined) payload.pharmacyId = updates.pharmacyId
+        if (updates.active !== undefined) payload.active = updates.active
+        if (updates.password) payload.password = updates.password
+        await api.updateUserRemote(id, payload)
+      } catch (err) {
+        throw err
+      }
+    }
+    const { password, ...safeUpdates } = updates
+    setUsersData((prev) => prev.map(u => u.id === id ? { ...u, ...safeUpdates, ...(safeUpdates.password ? {} : {}) } : u))
     logAudit('user_update', { userId: id, updates: Object.keys(updates) })
   }
 
-  const deleteUser = (id) => {
+  const deleteUser = async (id) => {
     if (!hasPermission('users.manage')) return
     const target = usersData.find(u => u.id === id)
     // لا يمكن حذف السوبر أدمين أو الحساب الذاتي
     if (!target || target.role === 'super_admin' || id === currentUser?.id) return
     // الأدمن لا يمكنه حذف أدمن آخر أو محاسب؟ الأدمن يدير صيدليته فقط
     if (currentUser?.role === 'admin' && target.pharmacyId !== currentUser.pharmacyId) return
+    if (serverStatus.online) {
+      try {
+        await api.deleteUserRemote(id)
+      } catch (err) {
+        throw err
+      }
+    }
     setUsersData((prev) => prev.filter(u => u.id !== id))
     logAudit('user_delete', { username: target.username, role: target.role })
+  }
+
+  // استبدال قائمة المستخدمين المحلية بمستخدمي الخادم الحقيقيين (بعد الدخول أو التحديث)
+  const importServerUsers = (serverUsers) => {
+    if (!Array.isArray(serverUsers) || serverUsers.length === 0) return false
+    setUsersData(serverUsers.map(u => ({ ...u, password: undefined })))
+    return true
+  }
+
+  // استبدال قائمة الصيدليات المحلية بصيدليات الخادم (بعد الدخول)
+  const importServerPharmacies = (serverPharmacies) => {
+    if (!Array.isArray(serverPharmacies) || serverPharmacies.length === 0) return false
+    setPharmaciesData(serverPharmacies)
+    return true
   }
 
   // المستخدمون الظاهرون حسب الدور
@@ -220,9 +273,22 @@ export const AppProvider = ({ children }) => {
   }, [usersData, currentUser, isSuperAdmin])
 
   // ===== إدارة الصيدليات (سوبر أدمين) =====
-  const addPharmacy = (pharmacy) => {
+  const addPharmacy = async (pharmacy) => {
     if (!hasPermission('pharmacies.manage')) return null
-    const newPharmacy = { ...pharmacy, id: `ph${Date.now()}` }
+    let newPharmacy = { ...pharmacy, id: `ph${Date.now()}` }
+    if (serverStatus.online) {
+      try {
+        const created = await api.createPharmacy({
+          name: pharmacy.name, nameEn: pharmacy.nameEn || pharmacy.name,
+          address: pharmacy.address || '', phone: pharmacy.phone || '',
+          email: pharmacy.email || '', license: pharmacy.license,
+          logo: pharmacy.logo || '💊',
+        })
+        if (created?.id) newPharmacy = { ...newPharmacy, id: created.id }
+      } catch (err) {
+        throw err
+      }
+    }
     setPharmaciesData((prev) => [...prev, newPharmacy])
     logAudit('pharmacy_add', { name: newPharmacy.name })
     return newPharmacy
@@ -459,7 +525,7 @@ export const AppProvider = ({ children }) => {
     // Auth & RBAC
     login, logout,
     hasPermission, isSuperAdmin, roleInfo,
-    usersData, visibleUsers, addUser, updateUser, deleteUser,
+    usersData, visibleUsers, addUser, updateUser, deleteUser, importServerUsers, importServerPharmacies,
     pharmaciesData, addPharmacy, updatePharmacy,
     // أسماء متوافقة قديمة (تستعملها صفحة الدخول)
     users: usersData,

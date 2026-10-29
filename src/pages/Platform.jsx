@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, Fragment, useCallback } from 'react'
 import { useApp } from '../contexts/AppContext'
+import { api } from '../lib/api'
 import { NoPermission } from '../components/PermissionGate'
 import { ROLE_INFO } from '../config/permissions'
 import {
@@ -9,15 +10,16 @@ import {
 
 // نافذة إضافة/تعديل مستخدم
 const UserModal = ({ user, onClose }) => {
-  const { t, isRTL, pharmaciesData, addUser, updateUser, usersData , pickName, language} = useApp()
+  const { t, isRTL, pharmaciesData, addUser, updateUser, usersData, pickName, language, serverStatus } = useApp()
   const [form, setForm] = useState(user || {
     name: '', username: '', password: '', role: 'pharmacist', pharmacyId: 'ph1', avatar: '👤',
   })
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const roles = Object.entries(ROLE_INFO).filter(([key]) => key !== 'super_admin')
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.name || !form.username || (!user && !form.password)) {
       setError(language === 'ar' ? 'يرجى ملء جميع الحقول الإلزامية' : language === 'fr' ? 'Veuillez remplir tous les champs obligatoires' : 'Please fill all required fields')
       return
@@ -30,14 +32,22 @@ const UserModal = ({ user, onClose }) => {
       setError(t('passwordTooShort'))
       return
     }
-    if (user) {
-      const updates = { name: form.name, role: form.role, pharmacyId: form.pharmacyId }
-      if (form.password) updates.password = form.password
-      updateUser(user.id, updates)
-    } else {
-      addUser(form)
+    setSaving(true)
+    setError('')
+    try {
+      if (user) {
+        const updates = { name: form.name, role: form.role, pharmacyId: form.pharmacyId }
+        if (form.password) updates.password = form.password
+        await updateUser(user.id, updates)
+      } else {
+        await addUser(form)
+      }
+      onClose()
+    } catch (err) {
+      setError(err?.message || (language === 'ar' ? 'فشل الحفظ على الخادم' : language === 'fr' ? 'Échec de l\u2019enregistrement sur le serveur' : 'Failed to save on server'))
+    } finally {
+      setSaving(false)
     }
-    onClose()
   }
 
   return (
@@ -80,8 +90,11 @@ const UserModal = ({ user, onClose }) => {
           )}
           {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{error}</p>}
           <div className="flex gap-2 pt-2">
-            <button onClick={submit} className="btn-primary flex-1"><Check className="w-4 h-4" />{t('save')}</button>
-            <button onClick={onClose} className="btn-secondary flex-1">{t('cancel')}</button>
+            <button onClick={submit} disabled={saving} className="btn-primary flex-1">
+              {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
+              {t('save')}
+            </button>
+            <button onClick={onClose} disabled={saving} className="btn-secondary flex-1">{t('cancel')}</button>
           </div>
         </div>
       </div>
@@ -91,17 +104,26 @@ const UserModal = ({ user, onClose }) => {
 
 // نافذة إضافة صيدلية
 const PharmacyModal = ({ onClose }) => {
-  const { t, isRTL, addPharmacy } = useApp()
+  const { t, isRTL, addPharmacy, language, serverStatus } = useApp()
   const [form, setForm] = useState({ name: '', nameEn: '', address: '', phone: '', email: '', license: '', logo: '💊' })
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.name || !form.license) {
       setError(language === 'ar' ? 'يرجى إدخال الاسم ورقم الترخيص' : language === 'fr' ? 'Veuillez saisir le nom et le numéro de licence' : 'Please enter name and license number')
       return
     }
-    addPharmacy({ ...form, nameEn: form.nameEn || form.name, color: 'blue' })
-    onClose()
+    setSaving(true)
+    setError('')
+    try {
+      await addPharmacy({ ...form, nameEn: form.nameEn || form.name, color: 'blue' })
+      onClose()
+    } catch (err) {
+      setError(err?.message || (language === 'ar' ? 'فشل الحفظ على الخادم' : language === 'fr' ? 'Échec de l\u2019enregistrement sur le serveur' : 'Failed to save on server'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -146,8 +168,11 @@ const PharmacyModal = ({ onClose }) => {
           </div>
           {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{error}</p>}
           <div className="flex gap-2 pt-2">
-            <button onClick={submit} className="btn-primary flex-1"><Check className="w-4 h-4" />{t('save')}</button>
-            <button onClick={onClose} className="btn-secondary flex-1">{t('cancel')}</button>
+            <button onClick={submit} disabled={saving} className="btn-primary flex-1">
+              {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
+              {t('save')}
+            </button>
+            <button onClick={onClose} disabled={saving} className="btn-secondary flex-1">{t('cancel')}</button>
           </div>
         </div>
       </div>
@@ -159,11 +184,49 @@ const Platform = () => {
   const {
     t, isRTL, language, hasPermission, pharmaciesData, usersData, salesData,
     productsData, customersData, auditLog, deleteUser, updateUser, serverStatus, syncToServer, currentUser,
+    pickName, importServerUsers,
   } = useApp()
   const [tab, setTab] = useState('overview')
   const [showUserModal, setShowUserModal] = useState(null) // null | 'new' | user object
   const [showPharmacyModal, setShowPharmacyModal] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [actionError, setActionError] = useState('') // أخطاء عمليات الحذف/التعطيل من الخادم
+
+  // تحديث قائمة المستخدمين من الخادم عند فتح الصفحة (المصدر الموثوق: SQLite)
+  // يعوّض مستخدمي العرض التجريبي بمستخدمي المنصة الحقيقيين.
+  const refreshServerUsers = useCallback(async () => {
+    if (!serverStatus.online) return
+    if (!currentUser || !['super_admin', 'admin'].includes(currentUser.role)) return
+    try {
+      const serverUsers = await api.fetchUsers()
+      if (serverUsers) importServerUsers(serverUsers)
+    } catch { /* الجلسة منتهية أو الخادم مشغول — تبقى القائمة المحلية */ }
+  }, [serverStatus.online, currentUser, importServerUsers])
+
+  useEffect(() => {
+    refreshServerUsers()
+  }, [refreshServerUsers])
+
+  // حذف/تعطيل مع معالجة أخطاء الخادم
+  const handleToggleActive = async (u) => {
+    setActionError('')
+    try {
+      await updateUser(u.id, { active: !u.active })
+    } catch (err) {
+      setActionError(err?.message || '')
+    }
+  }
+
+  const handleDeleteUser = async (u) => {
+    setActionError('')
+    const msg = language === 'ar' ? `حذف المستخدم ${u.name}؟` : language === 'fr' ? `Supprimer l'utilisateur ${u.name} ?` : `Delete user ${u.name}?`
+    if (!window.confirm(msg)) return
+    try {
+      await deleteUser(u.id)
+    } catch (err) {
+      setActionError(err?.message || '')
+    }
+  }
 
   if (!hasPermission('platform.manage')) return <NoPermission />
 
@@ -302,17 +365,17 @@ const Platform = () => {
                   <div key={i} className="font-semibold text-gray-500 p-2 text-center">{h}</div>
                 ))}
                 {Object.entries(ROLE_INFO).map(([role, info]) => (
-                  <>
-                    <div key={`${role}-label`} className="p-2 font-medium text-gray-900 flex items-center gap-1">
+                  <Fragment key={role}>
+                    <div className="p-2 font-medium text-gray-900 flex items-center gap-1">
                       <span>{info.badge}</span>
                       <span className="hidden sm:inline">{language === 'ar' ? info.shortAr : info.shortEn}</span>
                     </div>
-                    <div key={`${role}-inv`} className={`p-2 text-center ${role === 'admin' || role === 'super_admin' ? 'text-emerald-600' : 'text-gray-400'}`}>{(role === 'admin' || role === 'super_admin') ? '✓' : '—'}</div>
-                    <div key={`${role}-pos`} className={`p-2 text-center ${['super_admin', 'admin', 'pharmacist', 'cashier'].includes(role) ? 'text-emerald-600' : 'text-gray-400'}`}>{['super_admin', 'admin', 'pharmacist', 'cashier'].includes(role) ? '✓' : '—'}</div>
-                    <div key={`${role}-rep`} className={`p-2 text-center ${['super_admin', 'admin', 'accountant', 'pharmacist'].includes(role) ? 'text-emerald-600' : 'text-gray-400'}`}>{['super_admin', 'admin', 'accountant', 'pharmacist'].includes(role) ? '✓' : '—'}</div>
-                    <div key={`${role}-usr`} className={`p-2 text-center ${['super_admin', 'admin'].includes(role) ? 'text-emerald-600' : 'text-gray-400'}`}>{['super_admin', 'admin'].includes(role) ? '✓' : '—'}</div>
-                    <div key={`${role}-plt`} className={`p-2 text-center ${role === 'super_admin' ? 'text-emerald-600' : 'text-gray-400'}`}>{role === 'super_admin' ? '✓' : '—'}</div>
-                  </>
+                    <div className={`p-2 text-center ${role === 'admin' || role === 'super_admin' ? 'text-emerald-600' : 'text-gray-400'}`}>{(role === 'admin' || role === 'super_admin') ? '✓' : '—'}</div>
+                    <div className={`p-2 text-center ${['super_admin', 'admin', 'pharmacist', 'cashier'].includes(role) ? 'text-emerald-600' : 'text-gray-400'}`}>{['super_admin', 'admin', 'pharmacist', 'cashier'].includes(role) ? '✓' : '—'}</div>
+                    <div className={`p-2 text-center ${['super_admin', 'admin', 'accountant', 'pharmacist'].includes(role) ? 'text-emerald-600' : 'text-gray-400'}`}>{['super_admin', 'admin', 'accountant', 'pharmacist'].includes(role) ? '✓' : '—'}</div>
+                    <div className={`p-2 text-center ${['super_admin', 'admin'].includes(role) ? 'text-emerald-600' : 'text-gray-400'}`}>{['super_admin', 'admin'].includes(role) ? '✓' : '—'}</div>
+                    <div className={`p-2 text-center ${role === 'super_admin' ? 'text-emerald-600' : 'text-gray-400'}`}>{role === 'super_admin' ? '✓' : '—'}</div>
+                  </Fragment>
                 ))}
               </div>
             </div>
@@ -395,11 +458,20 @@ const Platform = () => {
         <div className="card p-4 lg:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-gray-900">{t('manageUsersAll')}</h3>
-            <button onClick={() => setShowUserModal('new')} className="btn-primary">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('addUser')}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={refreshServerUsers} disabled={!serverStatus.online} className="btn-secondary text-sm" title={serverStatus.online ? '' : (language === 'ar' ? 'الخادم غير متصل' : language === 'fr' ? 'Serveur hors ligne' : 'Server offline')}>
+                <Activity className="w-4 h-4" />
+                <span className="hidden sm:inline">{language === 'ar' ? 'تحديث' : language === 'fr' ? 'Actualiser' : 'Refresh'}</span>
+              </button>
+              <button onClick={() => setShowUserModal('new')} className="btn-primary">
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('addUser')}</span>
+              </button>
+            </div>
           </div>
+          {actionError && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">{actionError}</div>
+          )}
           {/* Desktop table */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
@@ -437,7 +509,7 @@ const Platform = () => {
                       </td>
                       <td className="py-3 px-2">
                         <button
-                          onClick={() => updateUser(u.id, { active: !u.active })}
+                          onClick={() => handleToggleActive(u)}
                           disabled={u.role === 'super_admin'}
                           className={`badge ${u.active ? 'badge-success' : 'badge-gray'} ${u.role !== 'super_admin' ? 'cursor-pointer hover:opacity-80' : 'opacity-100'}`}
                         >
@@ -455,7 +527,7 @@ const Platform = () => {
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => { if (window.confirm(language === 'ar' ? `حذف المستخدم ${u.name}؟` : language === 'fr' ? `Supprimer l'utilisateur ${u.name} ?` : `Delete user ${u.name}?`)) deleteUser(u.id) }}
+                            onClick={() => handleDeleteUser(u)}
                             disabled={u.role === 'super_admin'}
                             className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 disabled:opacity-40"
                             title={t('delete')}
@@ -491,7 +563,7 @@ const Platform = () => {
                     <p className="text-xs text-gray-600">{roleLabel(u.role)} • {u.role === 'super_admin' ? t('allPharmacies') : (ph ? (isRTL ? ph.name.split(' /')[0] : ph.nameEn) : '—')}</p>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => updateUser(u.id, { active: !u.active })}
+                        onClick={() => handleToggleActive(u)}
                         disabled={u.role === 'super_admin'}
                         className={`badge ${u.active ? 'badge-success' : 'badge-gray'}`}
                       >
@@ -499,7 +571,7 @@ const Platform = () => {
                       </button>
                       <button onClick={() => setShowUserModal(u)} disabled={u.role === 'super_admin'} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-40"><Pencil className="w-4 h-4" /></button>
                       <button
-                        onClick={() => { if (window.confirm(language === 'ar' ? `حذف المستخدم ${u.name}؟` : language === 'fr' ? `Supprimer l'utilisateur ${u.name} ?` : `Delete user ${u.name}?`)) deleteUser(u.id) }}
+                        onClick={() => handleDeleteUser(u)}
                         disabled={u.role === 'super_admin'}
                         className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 disabled:opacity-40"
                       >

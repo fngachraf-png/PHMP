@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
 import LanguageSwitcher from './LanguageSwitcher'
-import { Stethoscope, Store, Info, BookOpen, FileText, ShieldCheck, Lock, HeartPulse } from 'lucide-react'
+import { Stethoscope, Store, Info, BookOpen, FileText, ShieldCheck, Lock, HeartPulse, Download } from 'lucide-react'
 
 // =====================================================================
 // التخطيط الموحد للصفحات العامة (من نحن / دليل الاستخدام / الشروط /
-// الخصوصية) — ترويسة بروابط التنقل + زر دخول الموظفين + تذييل
+// الخصوصية / التحميل والتثبيت) — ترويسة بروابط التنقل + زر دخول
+// الموظفين + تذييل
 // =====================================================================
 
 const PublicLayout = ({ children, active }) => {
@@ -15,6 +16,7 @@ const PublicLayout = ({ children, active }) => {
     { to: '/shop', label: t('shopTitle'), icon: Store, key: 'shop' },
     { to: '/about', label: t('aboutUs'), icon: Info, key: 'about' },
     { to: '/guide', label: t('howToUse'), icon: BookOpen, key: 'guide' },
+    { to: '/download', label: t('downloadApp'), icon: Download, key: 'download' },
     { to: '/terms', label: t('termsOfUse'), icon: FileText, key: 'terms' },
     { to: '/privacy', label: t('privacyPolicy'), icon: ShieldCheck, key: 'privacy' },
   ]

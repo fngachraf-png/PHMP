@@ -46,7 +46,7 @@ export const en = {
 
   // Auth
   login: 'Login',
-  loginSubtitle: 'Select your pharmacy and enter your credentials',
+  loginSubtitle: 'Enter your official account credentials to continue',
   username: 'Username',
   password: 'Password',
   selectPharmacy: 'Select Pharmacy',
@@ -59,6 +59,10 @@ export const en = {
   allPharmacies: 'All Pharmacies',
   accountSuspended: 'This account is inactive. Contact the platform owner.',
   invalidCredentials: 'Invalid credentials',
+  loginServerUnreachable: 'Cannot reach the platform server. Check your internet connection or the local server status, then try again.',
+  serverChecking: 'Checking server connection...',
+  loginRealAccountsNote: 'Sign in with official staff accounts — requires connection to the platform server',
+  downloadApp: 'Download App',
 
   // Navigation
   dashboard: 'Dashboard',

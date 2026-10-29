@@ -9,7 +9,7 @@ import {
   Stethoscope, Store, MapPin, Phone, Search, ShoppingCart, Trash2, Plus, Minus,
   ArrowRight, ArrowLeft, PackageSearch, ClipboardList, LogOut, X, BadgeCheck,
   ShieldCheck, Truck, Stethoscope as StethoscopeIcon, Lock, UserRound,
-  Info, BookOpen, FileText
+  Info, BookOpen, FileText, Download
 } from 'lucide-react'
 
 // =====================================================================
@@ -496,6 +496,7 @@ const Shop = () => {
               <div className="flex flex-col gap-1.5">
                 <Link to="/about" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><Info className="w-3.5 h-3.5" /> {t('aboutUs')}</Link>
                 <Link to="/guide" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><BookOpen className="w-3.5 h-3.5" /> {t('howToUse')}</Link>
+                <Link to="/download" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><Download className="w-3.5 h-3.5" /> {t('downloadApp')}</Link>
               </div>
             </div>
             <div>

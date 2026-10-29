@@ -43,6 +43,24 @@ export const setApiKey = (key) => {
   } catch { /* ignore */ }
 }
 
+// ===== رمز JWT (جلسة الموظف بعد الدخول عبر الخادم) =====
+const JWT_KEY = 'pharmacare_jwt'
+
+export const getAuthToken = () => {
+  try {
+    return localStorage.getItem(JWT_KEY)?.replace(/"/g, '') || ''
+  } catch {
+    return ''
+  }
+}
+
+export const setAuthToken = (token) => {
+  try {
+    if (token) localStorage.setItem(JWT_KEY, JSON.stringify(token))
+    else localStorage.removeItem(JWT_KEY)
+  } catch { /* ignore */ }
+}
+
 const request = async (path, options = {}) => {
   const url = `${getApiUrl()}${path}`
   const controller = new AbortController()
@@ -64,6 +82,15 @@ const request = async (path, options = {}) => {
   }
 }
 
+// طلب مصادق بجلسة الموظف (Authorization: Bearer JWT)
+const authRequest = (path, options = {}) => {
+  const token = getAuthToken()
+  return request(path, {
+    ...options,
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) },
+  })
+}
+
 export const api = {
   // فحص جاهزية الخادم
   async checkHealth() {
@@ -80,10 +107,96 @@ export const api = {
     const res = await request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
+      timeout: 8000,
     })
-    if (!res.ok) throw new Error('فشل الاتصال بالخادم')
-    const data = await res.json()
-    if (data.token) localStorage.setItem('pharmacare_jwt', JSON.stringify(data.token))
+    // الخادم ردّ: أخطاء الدخول (401/403/429) تُمرَّر برسالتها الأصلية
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const err = new Error(data.error || 'فشل الاتصال بالخادم')
+      err.status = res.status
+      err.serverResponded = true
+      throw err
+    }
+    if (data.token) setAuthToken(data.token)
+    return data
+  },
+
+  // خروج: مسح رمز الجلسة محلياً
+  logout() {
+    setAuthToken('')
+  },
+
+  // ===== إدارة المستخدمين عبر الخادم (JWT) =====
+  async fetchUsers() {
+    const res = await authRequest('/api/users', { timeout: 8000 })
+    if (!res.ok) return null
+    const rows = await res.json()
+    // تحويل أعمدة SQLite (snake_case) إلى شكل الواجهة (camelCase)
+    return rows.map(u => ({
+      id: u.id,
+      username: u.username,
+      name: u.name,
+      nameEn: u.nameEn || '',
+      role: u.role,
+      pharmacyId: u.pharmacy_id ?? null,
+      avatar: u.avatar || '👤',
+      active: u.active === 1 || u.active === true,
+      lastLogin: u.last_login || null,
+    }))
+  },
+
+  async createUser(payload) {
+    const res = await authRequest('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      timeout: 8000,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || 'فشل إنشاء المستخدم على الخادم')
+    return data
+  },
+
+  async updateUserRemote(id, updates) {
+    const res = await authRequest(`/api/users/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+      timeout: 8000,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || 'فشل تحديث المستخدم على الخادم')
+    return data
+  },
+
+  async deleteUserRemote(id) {
+    const res = await authRequest(`/api/users/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      timeout: 8000,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || 'فشل حذف المستخدم على الخادم')
+    return data
+  },
+
+  // ===== الصيدليات =====
+  async fetchPharmacies() {
+    const res = await request('/api/pharmacies', { timeout: 8000 })
+    if (!res.ok) return null
+    const rows = await res.json()
+    return rows.map(p => ({
+      id: p.id, name: p.name, nameEn: p.nameEn || p.name, address: p.address || '',
+      phone: p.phone || '', email: p.email || '', license: p.license || '',
+      logo: p.logo || '💊', color: p.color || 'blue',
+    }))
+  },
+
+  async createPharmacy(payload) {
+    const res = await authRequest('/api/pharmacies', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      timeout: 8000,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || 'فشل إنشاء الصيدلية على الخادم')
     return data
   },
 
