@@ -352,6 +352,38 @@ Stage Summary:
 - الخللان الحرجان (اللغة + الأندرويد) أُصيلا من جذورهما ومثبتان رقمياً، والمصفوفة صارت جدولاً واضحاً مشتقاً من مصدر الحقيقة.
 - ينتظر: سحب المساعد المحلي وإعادة تشغيل الحارس، وتحقق المالك من الدخول من تطبيق الأندرويد المثبت حالياً.
 
+---
+Task ID: 9
+Agent: Local Server Agent
+Date: 2026-10-29
+Task: مزامنة البيئة المحلية مع v1.6.1 + التحقق من CORS الأندرويد والدخول الحي
+
+Work Log:
+- سحب `a577ca8` (v1.5.0 → v1.6.1) بـfast-forward دون تعارض؛ شجرة العمل نظيفة.
+- بناء الواجهة محلياً: `index-D1s7Sn3M.js` (مطابق للبصمة المنشورة على Pages وVercel).
+- إعادة تشغيل الخادم والنفق عبر `phmp-guard.sh restart` لتطبيق `CAPACITOR_ORIGINS` في `server/src/index.js`.
+- لا تغيير في اعتماديات الخادم/الواجهة؛ لم تُشغَّل `npm install`.
+- فحص قاعدة البيانات: `quick_check=ok` — 8 مستخدمين، 3 صيدليات.
+
+Testing (من العنوان العام):
+- CORS preflight من `https://localhost` → 204 + `ACAO: https://localhost`؛ دخول فعلي → 200 + JWT.
+- دخول ويب من `https://phmp.pages.dev` → 200 + `ACAO` صحيح.
+- `GET /api/users` بـJWT → 200 (8 مستخدمين).
+- `/api/data` بلا مفتاح → 401؛ بالمفتاح → 200.
+- `https://evil.example` → بلا `ACAO` (الأمان محفوظ).
+- متصفح حقيقي (Playwright) على `https://phmp.pages.dev/login`: دخول superadmin → `/platform` كاملة، **0 أخطاء كونسول**، لقطة `/tmp/phmp-platform.png`.
+- الصفحات `/login` `/download` `/reports` `/platform` `/shop` → 200.
+- Vercel: `phmplatform.vercel.app` و`pharmacare-pro-jade.vercel.app` → 200 وبصمة `index-D1s7Sn3M.js`.
+- APK: `https://phmp-download.pages.dev/PharmaCare-Pro.apk` → 200.
+
+Deployment:
+- لا commit جديد من جهة الخادم؛ الشجرة على `a577ca8` نظيفة.
+- Pages run `40861283978` → success | Android run `40861283984` → success (b2e8d77).
+
+Stage Summary:
+- البيئة المحلية متزامنة مع v1.6.1، ودخول الأندرويد مدعوم على مستوى الخادم.
+- المتبقي: تثبيت APK الجديد على الهاتف واختبار الدخول من التطبيق (تحقق المالك).
+
 ### أولويات العمل القادمة (مرشحة — لاتخذها إلا بتكليف من المالك)
 - [x] ربط تسجيل الدخول بالخادم المحلي (JWT) بدل mockData ✅ منجز في v1.5.0 (Task 6)
 - [x] تصدير تقارير PDF/Excel في صفحة التقارير ✅ منجز في v1.6.0 (Task 7 — CSV + طباعة PDF/A4)
