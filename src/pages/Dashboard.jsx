@@ -5,10 +5,12 @@ import {
   Activity, Heart, Pill, Stethoscope
 } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
+import { getChartTheme } from '../lib/chartTheme'
 import { Link } from 'react-router-dom'
 
 const Dashboard = () => {
-  const { t, isRTL, productsData, salesData, customersData, prescriptionsData, currentPharmacy , pickName, language} = useApp()
+  const { t, isRTL, productsData, salesData, customersData, prescriptionsData, currentPharmacy , pickName, language, theme} = useApp()
+  const chart = getChartTheme(theme)
 
   // Calculate KPIs
   const today = new Date().toISOString().split('T')[0]
@@ -176,16 +178,12 @@ const Dashboard = () => {
                   <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="day" stroke="#9ca3af" fontSize={12} />
-              <YAxis stroke="#9ca3af" fontSize={12} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} />
+              <XAxis dataKey="day" stroke={chart.axisColor} fontSize={12} tickLine={false} />
+              <YAxis stroke={chart.axisColor} fontSize={12} tickLine={false} />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  fontSize: '12px'
-                }}
+                contentStyle={chart.tooltipStyle}
+                itemStyle={chart.tooltipItemStyle}
               />
               <Area type="monotone" dataKey="sales" stroke="#10b981" strokeWidth={2} fill="url(#colorSales)" />
             </AreaChart>
@@ -211,7 +209,7 @@ const Dashboard = () => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip contentStyle={chart.tooltipStyle} itemStyle={chart.tooltipItemStyle} />
             </PieChart>
           </ResponsiveContainer>
           <div className="grid grid-cols-2 gap-2 mt-4">

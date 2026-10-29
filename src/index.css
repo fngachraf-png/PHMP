@@ -19,6 +19,21 @@
     font-family: 'Cairo', 'Inter', sans-serif;
   }
 
+  /* ===== الوضع القاتم: أساس الصفحة (class «dark» على <html>) ===== */
+  html.dark body {
+    background-color: #0f172a;
+    color: #f1f5f9;
+  }
+
+  html.dark * {
+    border-color: #334155;
+  }
+
+  html.dark select option {
+    background-color: #1e293b;
+    color: #e2e8f0;
+  }
+
   /* مناطق الأمان لأجهزة الحواف المنحنية وتطبيق أندرويد بملء الشاشة */
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);
@@ -48,6 +63,18 @@
 
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-400;
+  }
+
+  html.dark ::-webkit-scrollbar-track {
+    background-color: #0f172a;
+  }
+
+  html.dark ::-webkit-scrollbar-thumb {
+    background-color: #334155;
+  }
+
+  html.dark ::-webkit-scrollbar-thumb:hover {
+    background-color: #475569;
   }
 }
 
@@ -129,6 +156,156 @@
   }
 }
 
+/* =====================================================================
+   الوضع القاتم — طبقة تجاوزات مركزية
+   مبدأ العمل: نفس أصناف Tailwind الفاتحة تُعاد تعريفها تحت html.dark
+   فتنعكس كل صفحات المنصة دفعة واحدة دون تعديل كل مكوّن على حدة.
+   ملاحظة تقنية: @media screen توضع داخل @layer utilities (وليس العكس)
+   لأن Tailwind يرفع محتوى الطبقات خارج أي غلاف وسائط يحيط بها.
+   (تُطبَّق على الشاشة فقط — الطباعة تبقى فاتحة دائماً)
+   ===================================================================== */
+@layer utilities {
+  @media screen {
+    /* ===== الأسطح والخلفيات ===== */
+    .dark .bg-white { background-color: #1e293b; }
+    .dark .bg-white\/95 { background-color: rgba(30, 41, 59, 0.97); }
+    .dark .bg-white\/90 { background-color: rgba(30, 41, 59, 0.95); }
+    .dark .bg-white\/85 { background-color: rgba(30, 41, 59, 0.94); }
+    .dark .bg-white\/80 { background-color: rgba(30, 41, 59, 0.92); }
+    .dark .bg-white\/60 { background-color: rgba(30, 41, 59, 0.72); }
+
+    .dark .bg-gray-50 { background-color: #0f172a; }
+    .dark .bg-gray-50\/50 { background-color: rgba(15, 23, 42, 0.6); }
+    .dark .bg-gray-100 { background-color: #1e293b; }
+    .dark .bg-gray-200 { background-color: #334155; }
+    .dark .bg-gray-300 { background-color: #475569; }
+    .dark .bg-gray-400 { background-color: #64748b; }
+
+    /* زر «دخول الموظفين» الأسود ينعكس لزر فاتح في الوضع الداكن */
+    .dark .bg-gray-900.text-white { background-color: #f1f5f9; color: #0f172a; }
+    .dark .bg-gray-900.text-white:hover { background-color: #e2e8f0; }
+
+    /* ===== النصوص ===== */
+    .dark .text-gray-900 { color: #f1f5f9; }
+    .dark .text-gray-800 { color: #e2e8f0; }
+    .dark .text-gray-700 { color: #e2e8f0; }
+    .dark .text-gray-600 { color: #cbd5e1; }
+    .dark .text-gray-500 { color: #94a3b8; }
+    .dark .text-gray-400 { color: #94a3b8; }
+    .dark .text-gray-300 { color: #cbd5e1; }
+
+    /* ===== الحدود والفواصل ===== */
+    .dark .border-gray-100 { border-color: #1e293b; }
+    .dark .border-gray-200 { border-color: #334155; }
+    .dark .border-gray-300 { border-color: #475569; }
+    .dark .border-white\/30 { border-color: rgba(255, 255, 255, 0.12); }
+    .dark .border-white\/40 { border-color: rgba(255, 255, 255, 0.14); }
+
+    .dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #26324a; }
+    .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #334155; }
+
+    /* ===== حالات التحويم ===== */
+    .dark .hover\:bg-gray-50:hover { background-color: #27354d; }
+    .dark .hover\:bg-gray-100:hover { background-color: #2b3a54; }
+    .dark .hover\:bg-gray-200:hover { background-color: #384761; }
+    .dark .hover\:bg-white:hover { background-color: #334155; }
+    .dark .hover\:bg-white\/80:hover { background-color: rgba(51, 65, 85, 0.85); }
+    .dark .hover\:text-gray-900:hover { color: #f1f5f9; }
+    .dark .hover\:border-gray-300:hover { border-color: #64748b; }
+    .dark .hover\:bg-red-50:hover { background-color: rgba(239, 68, 68, 0.16); }
+    .dark .hover\:bg-red-100:hover { background-color: rgba(239, 68, 68, 0.24); }
+    .dark .hover\:bg-primary-50:hover { background-color: rgba(16, 185, 129, 0.15); }
+    .dark .hover\:bg-primary-100:hover { background-color: rgba(16, 185, 129, 0.22); }
+    .dark .hover\:border-primary-300:hover { border-color: #34d399; }
+    .dark .hover\:border-primary-400:hover { border-color: #34d399; }
+    .dark .hover\:border-primary-500:hover { border-color: #10b981; }
+
+    /* ===== خلفيات ملونة فاتحة (شرائح، شارات، أيقونات KPI) ===== */
+    .dark .bg-primary-50 { background-color: rgba(16, 185, 129, 0.13); }
+    .dark .bg-primary-50\/50 { background-color: rgba(16, 185, 129, 0.08); }
+    .dark .bg-primary-100 { background-color: rgba(16, 185, 129, 0.2); }
+    .dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.13); }
+    .dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.2); }
+    .dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.15); }
+    .dark .bg-blue-100 { background-color: rgba(59, 130, 246, 0.22); }
+    .dark .bg-purple-50 { background-color: rgba(168, 85, 247, 0.15); }
+    .dark .bg-purple-100 { background-color: rgba(168, 85, 247, 0.22); }
+    .dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.15); }
+    .dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.22); }
+    .dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.14); }
+    .dark .bg-red-100 { background-color: rgba(239, 68, 68, 0.22); }
+    .dark .bg-violet-50 { background-color: rgba(139, 92, 246, 0.15); }
+    .dark .bg-violet-100 { background-color: rgba(139, 92, 246, 0.22); }
+    .dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.22); }
+
+    /* ===== نصوص ملونة (تباين عالٍ على الأسطح الداكنة) ===== */
+    .dark .text-primary-600 { color: #34d399; }
+    .dark .text-primary-700 { color: #6ee7b7; }
+    .dark .text-primary-800 { color: #6ee7b7; }
+    .dark .text-emerald-500 { color: #34d399; }
+    .dark .text-emerald-600 { color: #34d399; }
+    .dark .text-emerald-700 { color: #6ee7b7; }
+    .dark .text-emerald-800 { color: #6ee7b7; }
+    .dark .text-blue-600 { color: #60a5fa; }
+    .dark .text-blue-700 { color: #93c5fd; }
+    .dark .text-blue-800 { color: #bfdbfe; }
+    .dark .text-purple-600 { color: #c084fc; }
+    .dark .text-purple-700 { color: #d8b4fe; }
+    .dark .text-amber-500 { color: #fbbf24; }
+    .dark .text-amber-600 { color: #fbbf24; }
+    .dark .text-amber-700 { color: #fcd34d; }
+    .dark .text-amber-800 { color: #fde047; }
+    .dark .text-amber-900 { color: #fde68a; }
+    .dark .text-red-500 { color: #f87171; }
+    .dark .text-red-600 { color: #f87171; }
+    .dark .text-red-700 { color: #fca5a5; }
+    .dark .text-red-900 { color: #fecaca; }
+    .dark .text-violet-500 { color: #a78bfa; }
+    .dark .text-violet-600 { color: #a78bfa; }
+    .dark .text-violet-700 { color: #c4b5fd; }
+    .dark .text-orange-700 { color: #fdba74; }
+
+    /* ===== حدود ملونة ===== */
+    .dark .border-emerald-200 { border-color: rgba(16, 185, 129, 0.35); }
+    .dark .border-amber-200 { border-color: rgba(245, 158, 11, 0.35); }
+    .dark .border-red-200 { border-color: rgba(239, 68, 68, 0.35); }
+    .dark .border-primary-300 { border-color: rgba(16, 185, 129, 0.4); }
+    .dark .border-primary-400 { border-color: rgba(16, 185, 129, 0.5); }
+    .dark .border-primary-500 { border-color: #10b981; }
+
+    /* شارة العدّاد الكهرمانية تحتفظ بنص داكن (استثناء لقاعدة text-gray-900) */
+    .dark .bg-amber-400.text-gray-900 { color: #111827; }
+
+    /* ===== عنصر الإدخال placeholder ===== */
+    .dark .placeholder-gray-400::placeholder { color: #64748b; }
+
+    /* ===== المكوّنات المشتركة ===== */
+    .dark .card { background-color: #1e293b; border-color: #334155; }
+    .dark .input {
+      background-color: #0f172a;
+      border-color: #475569;
+      color: #f1f5f9;
+    }
+    .dark .label { color: #cbd5e1; }
+    .dark .btn-secondary {
+      background-color: #1e293b;
+      color: #e2e8f0;
+      border-color: #475569;
+    }
+    .dark .btn-secondary:hover { background-color: #28354c; }
+    .dark .table-container { border-color: #334155; }
+    .dark .table th { background-color: #172033; color: #cbd5e1; }
+    .dark .table td { color: #e2e8f0; }
+    .dark .table tbody tr:hover { background-color: #27354d; }
+    .dark .badge-success { background-color: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+    .dark .badge-warning { background-color: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+    .dark .badge-danger { background-color: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+    .dark .badge-info { background-color: rgba(59, 130, 246, 0.22); color: #93c5fd; }
+    .dark .badge-gray { background-color: #334155; color: #cbd5e1; }
+    .dark .glass { background-color: rgba(15, 23, 42, 0.82); }
+  }
+}
+
 @layer utilities {
   .rtl-flip {
     transform: scaleX(-1);
@@ -153,34 +330,41 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* شبكة الرسوم المبيانية تظهر تحت المحتوى في الوضع القاتم */
+  .dark .recharts-wrapper,
+  .dark .recharts-surface { color: #94a3b8; }
 }
 
 /* ===================================================================
-   أنماط طباعة الفواتير — تُطبع منطقة الفاتورة فقط (80mm حراري/عادي)
-   يطبع: اسم الصيدلية + اسم الدواء + سعره + طريقة الدفع
+   أنماط الطباعة — بنية مزدوجة الوضع:
+   1) body.print-mode-invoice : طباعة فاتورة 80mm (حراري/عادي) — منطقة .print-area فقط
+   2) body.print-mode-report  : طباعة/تصدير تقرير A4 — منطقة .report-print-area فقط
+   مقاس الورقة (@page) يُحقن ديناميكياً من lib/print.js عند الطباعة،
+   حتى لا يتضارب مقاس الفاتورة مع طباعة التقارير أو الصفحات الأخرى.
    =================================================================== */
 @media print {
-  @page {
-    size: 80mm auto;
-    margin: 4mm;
-  }
-
   html, body {
     height: auto !important;
     min-height: 0 !important;
     background: #fff !important;
   }
 
-  /* إخفاء كل شيء ما عدا منطقة الطباعة */
-  body * {
+  .no-print {
+    display: none !important;
+  }
+
+  /* ===== 1) وضع الفاتورة 80mm ===== */
+  body.print-mode-invoice * {
     visibility: hidden !important;
   }
 
-  .print-area, .print-area * {
+  body.print-mode-invoice .print-area,
+  body.print-mode-invoice .print-area * {
     visibility: visible !important;
   }
 
-  .print-area {
+  body.print-mode-invoice .print-area {
     position: fixed !important;
     top: 0 !important;
     inset-inline-start: 0 !important;
@@ -191,17 +375,60 @@
     box-shadow: none !important;
     margin: 0 !important;
     padding: 0 !important;
+    background: #fff !important;
+    color: #111827 !important;
   }
 
-  .no-print {
-    display: none !important;
-  }
-
-  .print-area table {
+  body.print-mode-invoice .print-area table {
     page-break-inside: auto;
   }
 
-  .print-area tr {
+  body.print-mode-invoice .print-area tr {
     page-break-inside: avoid;
   }
+
+  /* ===== 2) وضع التقرير A4 ===== */
+  body.print-mode-report * {
+    visibility: hidden !important;
+  }
+
+  body.print-mode-report .report-print-area,
+  body.print-mode-report .report-print-area * {
+    visibility: visible !important;
+  }
+
+  body.print-mode-report .report-print-area {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    inset-inline-start: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #fff !important;
+    color: #111827 !important;
+    padding: 0 !important;
+  }
+
+  body.print-mode-report .report-print-area table {
+    width: 100% !important;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+
+  body.print-mode-report .report-print-area tr {
+    page-break-inside: avoid;
+  }
+
+  body.print-mode-report .report-print-area th,
+  body.print-mode-report .report-print-area td {
+    border: 1px solid #d1d5db !important;
+    padding: 4px 8px !important;
+    color: #111827 !important;
+    background: #fff !important;
+  }
+}
+
+/* منطقة طباعة التقرير: مخفية على الشاشة، تظهر فقط عند الطباعة */
+.report-print-area {
+  display: none;
 }

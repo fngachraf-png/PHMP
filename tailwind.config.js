@@ -41,10 +41,16 @@ export default {
       }
     },
   },
+  // الوضع القاتم عبر class على <html> (يديره AppContext + ThemeToggle)
+  darkMode: 'class',
   plugins: [],
   // Safelist dynamically-used classes so Tailwind includes them in build
   safelist: [
-    { pattern: /^bg-(emerald|blue|purple|amber)-(100)/ },
-    { pattern: /^text-(emerald|blue|purple|amber)-(600)/ },
+    // بطاقات KPI وتبويبات التقارير (bg-*-600 ديناميكي)
+    { pattern: /^bg-(emerald|blue|purple|amber|red|violet|indigo)-(50|100|500|600)/ },
+    // نصوص ملونة ديناميكية (text-*-600/700)
+    { pattern: /^text-(emerald|blue|purple|amber|red|violet|indigo)-(500|600|700|800)/ },
+    // حدود ديناميكية (border-*-500 في نقطة البيع والإعدادات)
+    { pattern: /^border-(emerald|blue|purple|amber|red|violet|indigo)-(300|500)/ },
   ]
 }

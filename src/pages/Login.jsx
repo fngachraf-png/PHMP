@@ -4,6 +4,7 @@ import { useApp } from '../contexts/AppContext'
 import { api } from '../lib/api'
 import { Stethoscope, Lock, User as UserIcon, Eye, EyeOff, ShieldCheck, Pill, Sparkles, Building2, ShoppingBag, Wifi, WifiOff, Loader2 } from 'lucide-react'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import ThemeToggle from '../components/ThemeToggle'
 
 // صفحة دخول الموظفين — المصادقة عبر الخادم المحلي (SQLite + JWT + bcrypt)
 // الحسابات التجريبية أُزيلت: الدخول متاح فقط بحسابات رسمية أنشأها مالك المنصة.
@@ -69,12 +70,12 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-gradient-to-br from-primary-50 via-white to-primary-100 relative overflow-hidden">
+    <div className="min-h-[100dvh] flex flex-col p-4 bg-gradient-to-br from-primary-50 via-white to-primary-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse-slow" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse-slow" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary-200 dark:bg-primary-700 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl opacity-30 dark:opacity-20 animate-pulse-slow" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-200 dark:bg-blue-800 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl opacity-30 dark:opacity-20 animate-pulse-slow" />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-100 dark:bg-primary-800 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl opacity-20 dark:opacity-15" />
       </div>
 
       {/* Floating pills decoration */}
@@ -95,12 +96,15 @@ const Login = () => {
         ))}
       </div>
 
-      {/* Language switcher (عربي / Français / English) */}
-      <div className="absolute top-6 z-10" style={{ [isRTL ? 'left' : 'right']: '1.5rem' }}>
+      {/* شريط علوي داخل تدفق الصفحة: اللغة + الوضع الفاتح/الداكن
+          (كان مبدل اللغة مثبتاً بشكل مطلق فوق البطاقة فيتداخل معها على الهاتف) */}
+      <div className="relative z-20 w-full flex flex-wrap items-center justify-end gap-2 py-1">
+        <ThemeToggle variant="pill" />
         <LanguageSwitcher variant="pill" />
       </div>
 
-      <div className="relative w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center z-10 py-8">
+      <div className="relative flex-1 flex items-center justify-center w-full">
+        <div className="relative w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center z-10 py-8">
         {/* Left side - branding */}
         <div className="hidden lg:block space-y-6 animate-slide-up">
           <div className="flex items-center gap-3">
@@ -138,7 +142,7 @@ const Login = () => {
             ].map((feature, i) => (
               <div
                 key={i}
-                className="bg-white/60 backdrop-blur-md rounded-xl p-4 border border-white/40 hover:bg-white/80 transition-all"
+                className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-md rounded-xl p-4 border border-white/40 dark:border-white/10 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all"
               >
                 <div className={`w-10 h-10 rounded-lg bg-${feature.color}-100 flex items-center justify-center mb-2`}>
                   <feature.icon className={`w-5 h-5 text-${feature.color}-600`} />
@@ -150,7 +154,7 @@ const Login = () => {
         </div>
 
         {/* Right side - login form */}
-        <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border border-white/40 p-8 lg:p-10 animate-slide-up">
+        <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl border border-white/40 dark:border-white/10 p-8 lg:p-10 animate-slide-up">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-6">
             <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
@@ -272,6 +276,7 @@ const Login = () => {
             <Link to="/privacy" className="hover:text-primary-600 transition-colors">{t('privacyPolicy')}</Link>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

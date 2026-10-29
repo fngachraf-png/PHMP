@@ -1,5 +1,7 @@
 import { useApp } from '../contexts/AppContext'
-import { Printer, Receipt, Truck, Stethoscope } from 'lucide-react'
+import { Printer, Receipt, Truck, Stethoscope, Download } from 'lucide-react'
+import { printInvoice } from '../lib/print'
+import { exportToCSV } from '../lib/exportUtils'
 
 // =====================================================================
 // فاتورة البيع / وصل التوصيل — قابل للطباعة
@@ -32,6 +34,26 @@ const InvoicePrint = ({ sale, mode = 'invoice' }) => {
 
   const title = mode === 'delivery' ? t('deliveryNote') : t('invoice')
   const now = new Date(sale.date ? `${sale.date}T${sale.time || '00:00'}` : (sale.createdAt || Date.now()))
+
+  // تصدير الفاتورة كملف CSV (UTF-8 + BOM) — يُفتح سليماً في Excel بالعربية
+  const exportInvoiceCSV = () => {
+    const rows = [
+      [t('description'), t('quantity'), t('unitPrice'), t('lineTotal')],
+      ...items.map((item) => [
+        pickName(item) || item.name || '',
+        item.quantity,
+        Number(item.price).toFixed(2),
+        (item.price * item.quantity).toFixed(2),
+      ]),
+      ['', '', t('subtotal'), Number(sale.subtotal || 0).toFixed(2)],
+      ...(sale.discount > 0 ? [['', '', t('discount'), `-${Number(sale.discount).toFixed(2)}`]] : []),
+      ...(sale.tax > 0 ? [['', '', t('tax'), Number(sale.tax || 0).toFixed(2)]] : []),
+      ...(isOrder && sale.deliveryFee > 0 ? [['', '', t('deliveryFee'), Number(sale.deliveryFee || 0).toFixed(2)]] : []),
+      ['', '', t('grandTotal'), Number(sale.total || 0).toFixed(2)],
+      ['', '', t('paymentMethod'), paymentLabel],
+    ]
+    exportToCSV(sale.number || 'invoice', rows)
+  }
 
   return (
     <div className="space-y-4">
@@ -162,11 +184,15 @@ const InvoicePrint = ({ sale, mode = 'invoice' }) => {
         </div>
       </div>
 
-      {/* أزرار الطباعة (لا تظهر في الورقة) */}
-      <div className="no-print flex items-center justify-center gap-2">
-        <button onClick={() => window.print()} className="btn-primary text-sm">
+      {/* أزرار الطباعة والتصدير (لا تظهر في الورقة) */}
+      <div className="no-print flex items-center justify-center gap-2 flex-wrap">
+        <button onClick={printInvoice} className="btn-primary text-sm">
           <Printer className="w-4 h-4" />
           {mode === 'delivery' ? t('printDeliveryNote') : t('printInvoice')}
+        </button>
+        <button onClick={exportInvoiceCSV} className="btn-secondary text-sm">
+          <Download className="w-4 h-4" />
+          {t('exportCSV')}
         </button>
       </div>
     </div>

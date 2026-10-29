@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
 import LanguageSwitcher from './LanguageSwitcher'
+import ThemeToggle from './ThemeToggle'
 import { Stethoscope, Store, Info, BookOpen, FileText, ShieldCheck, Lock, HeartPulse, Download } from 'lucide-react'
 
 // =====================================================================
@@ -22,7 +23,7 @@ const PublicLayout = ({ children, active }) => {
   ]
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-primary-50/60 via-white to-white flex flex-col">
+    <div className="min-h-[100dvh] bg-gradient-to-b from-primary-50/60 via-white to-white dark:from-slate-900/60 dark:via-slate-900 dark:to-slate-900 flex flex-col">
       {/* ===== الترويسة ===== */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-gray-200 safe-top">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-3">
@@ -51,7 +52,8 @@ const PublicLayout = ({ children, active }) => {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2 ms-auto md:ms-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 ms-auto md:ms-0">
+            <ThemeToggle variant="icon" />
             <div className="hidden sm:block">
               <LanguageSwitcher variant="compact" />
             </div>
@@ -78,8 +80,8 @@ const PublicLayout = ({ children, active }) => {
           ))}
         </nav>
 
-        {/* مفتاح اللغة للهواتف */}
-        <div className="sm:hidden pb-2 px-4">
+        {/* مفتاح اللغة + الوضع للهواتف */}
+        <div className="sm:hidden pb-2 px-4 flex items-center justify-between gap-2">
           <LanguageSwitcher variant="compact" />
         </div>
       </header>

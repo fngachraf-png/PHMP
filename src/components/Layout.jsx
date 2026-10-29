@@ -4,10 +4,11 @@ import {
   Receipt, BarChart3, Settings, LogOut, Menu, X, Bell,
   Stethoscope, Crown, Scale, Building2, Wifi, WifiOff, Home, Inbox
 } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { ROLE_INFO } from '../config/permissions'
 import LanguageSwitcher from './LanguageSwitcher'
+import ThemeToggle from './ThemeToggle'
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { t, isRTL, currentPharmacy, currentUser, logout, language, hasPermission, isSuperAdmin, activePharmacyId, switchPharmacy, pharmaciesData, serverStatus, visibleOrders, pickName } = useApp()
@@ -191,11 +192,46 @@ const Sidebar = ({ isOpen, onClose }) => {
 }
 
 const Header = ({ onMenuClick }) => {
-  const { t, currentUser, isRTL, language, visibleOrders } = useApp()
+  const { t, currentUser, isRTL, language, visibleOrders, notifications } = useApp()
   const [showNotifications, setShowNotifications] = useState(false)
-  const { notifications } = useApp()
+  const [notifPos, setNotifPos] = useState(null)
+  const bellRef = useRef(null)
 
   const pendingOrders = visibleOrders.filter(o => o.status === 'pending').length
+
+  // حساب موضع قائمة الإشعارات من موضع الزر نفسه (fixed + تثبيت داخل الشاشة)
+  // — يمنع خروج القائمة عن حدود الشاشة في RTL/الهاتف ويمنع تشويه عرض المنصة
+  const toggleNotifications = () => {
+    if (!showNotifications) {
+      const rect = bellRef.current?.getBoundingClientRect()
+      if (rect) {
+        const M = 8
+        const width = Math.min(320, window.innerWidth - M * 2)
+        // في RTL الزر قرب الحافة اليسرى ← نحاذي حافة القائمة اليسرى مع الزر؛
+        // في LTR الزر قرب الحافة اليمنى ← نحاذي حافة القائمة اليمنى مع الزر
+        let left = isRTL ? rect.left : rect.right - width
+        left = Math.max(M, Math.min(left, window.innerWidth - width - M))
+        const top = Math.min(rect.bottom + M, window.innerHeight - 140)
+        setNotifPos({ top, left, width })
+      }
+    }
+    setShowNotifications(!showNotifications)
+  }
+
+  // إغلاق قائمة الإشعارات عند التمرير/Escape/تغيير الحجم كي لا تنفصل عن زرها
+  useEffect(() => {
+    if (!showNotifications) return
+    const close = () => setShowNotifications(false)
+    const onKey = (e) => { if (e.key === 'Escape') close() }
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [showNotifications])
 
   const roleLabel = (role) => {
     const info = ROLE_INFO[role]
@@ -227,24 +263,29 @@ const Header = ({ onMenuClick }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Live orders quick badge */}
           {pendingOrders > 0 && (
             <Link
               to="/orders"
-              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold hover:bg-amber-100 transition-colors animate-pulse-slow"
+              className="relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold hover:bg-amber-100 transition-colors animate-pulse-slow"
             >
               <Inbox className="w-3.5 h-3.5" />
               {pendingOrders}
             </Link>
           )}
 
+          {/* Theme toggle — الوضع الفاتح/الداكن */}
+          <ThemeToggle variant="icon" />
+
           {/* Notifications */}
           <div className="relative">
             <button
-              onClick={() => setShowNotifications(!showNotifications)}
+              ref={bellRef}
+              onClick={toggleNotifications}
               className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
               aria-label="Notifications"
+              aria-expanded={showNotifications}
             >
               <Bell className="w-5 h-5 text-gray-700" />
               {notifications.length > 0 && (
@@ -252,10 +293,13 @@ const Header = ({ onMenuClick }) => {
               )}
             </button>
 
-            {showNotifications && (
+            {showNotifications && notifPos && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
+                <div
+                  className="fixed z-50 bg-white rounded-xl shadow-xl border border-gray-200 max-h-80 sm:max-h-96 overflow-y-auto animate-slide-up"
+                  style={{ top: notifPos.top, left: notifPos.left, width: notifPos.width }}
+                >
                   <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                     <h3 className="font-semibold text-gray-900">{t('notifications')}</h3>
                     <span className="text-xs text-gray-500">{notifications.length}</span>

@@ -30,7 +30,15 @@ export const AppProvider = ({ children }) => {
   }
 
   const [language, setLanguage] = useState(() => loadState('language', 'ar'))
-  const [theme, setTheme] = useState(() => loadState('theme', 'light'))
+  // الوضع القاتم: يبدأ من التفضيل المحفوظ، وإلا من تفضيل نظام المستخدم
+  const [theme, setTheme] = useState(() => {
+    const stored = loadState('theme', null)
+    if (stored === 'light' || stored === 'dark') return stored
+    try {
+      return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light'
+    } catch { return 'light' }
+  })
+  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark')
   const [currentUser, setCurrentUser] = useState(() => loadState('user', null))
   const [currentPharmacy, setCurrentPharmacy] = useState(() => loadState('pharmacy', null))
   // الصيدلية النشطة (للسوبر أدمين: يمكنه التنقل بين الصيدليات أو رؤية الكل)
@@ -85,6 +93,15 @@ export const AppProvider = ({ children }) => {
     document.documentElement.lang = language
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr'
   }, [language])
+
+  // تطبيق الوضع القاتم على <html> + إخبار المتصفح بلوحة النظام (نماذج/تمرير) + لون شريط الهاتف
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.toggle('dark', theme === 'dark')
+    root.style.colorScheme = theme
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f172a' : '#10b981')
+  }, [theme])
 
   // فحص الخادم المحلي عند الإقلاع
   useEffect(() => {
@@ -514,7 +531,7 @@ export const AppProvider = ({ children }) => {
   const value = {
     // State
     language, setLanguage,
-    theme, setTheme,
+    theme, setTheme, toggleTheme,
     currentUser, currentPharmacy,
     activePharmacyId, switchPharmacy,
     productsData, customersData, suppliersData, prescriptionsData, salesData,

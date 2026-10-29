@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useApp } from '../contexts/AppContext'
+import { exportToCSV, money } from '../lib/exportUtils'
 import {
   Plus, Search, Edit, Trash2, Filter, Package, AlertTriangle,
   Calendar, TrendingDown, Barcode, Pill, X, Save, Download,
@@ -115,7 +116,24 @@ const Inventory = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="btn-secondary">
+          {/* تصدير قائمة الأصناف المعروضة (مع الفلاتر) — CSV يفتح سليماً في Excel */}
+          <button
+            onClick={() => exportToCSV('inventory', [
+              [
+                t('description'), t('sku') || 'SKU', t('barcode'),
+                t('quantity'), t('minStock') || 'Min', t('unitCost'),
+                t('salePrice'), t('stockValue'), t('expiryDate') || 'Expiry',
+              ],
+              ...filteredProducts.map((p) => [
+                pickName(p) || p.name, p.sku || '', p.barcode || '',
+                p.stock, p.minStock,
+                Number(p.cost || 0).toFixed(2), Number(p.price || 0).toFixed(2),
+                (p.stock * p.cost || 0).toFixed(2), p.expiry || '',
+              ]),
+            ])}
+            className="btn-secondary"
+            title={t('exportCSV')}
+          >
             <Download className="w-4 h-4" />
             {t('export')}
           </button>
