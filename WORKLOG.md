@@ -19,7 +19,7 @@
 | الخادم المحلي | `server/` — Express + SQLite (JWT + bcrypt) + Workers VPC + نفق دائم: `https://phmp-api.balbolghol-ai.workers.dev` |
 | قاعدة الأدوية | 5917 دواء من اللائحة الرسمية المغربية (`src/data/moroccanDrugs.js`) |
 | اللغات | العربية (RTL) / الفرنسية / الإنجليزية (`src/i18n/{ar,fr,en}.js`) |
-| الإصدار الحالي | **v1.6.0** (انظر CHANGELOG.md) |
+| الإصدار الحالي | **v1.6.1** (انظر CHANGELOG.md) |
 
 ## 🔑 حسابات الدخول
 
@@ -314,6 +314,40 @@ Deployment:
 Stage Summary:
 - كل ملاحظات المالك منجزة: وضع قاتم كامل، إشعارات هاتف سليمة، لغة بلا تداخل ولا قص، تقارير بمؤشرات فواتير قابلة للقياس ومتجاوبة، تباين محسّن، تصدير وطباعة يعملان فعلياً.
 - ملاحظة للمساعد المحلي: لا تغييرات خادمية — كل التعديلات في الواجهة فقط.
+
+---
+Task ID: 8
+Agent: Main Agent (Z.ai)
+Date: 2026-10-29
+Task: v1.6.1 — إصلاح استجابة مبدّل اللغة + دخول تطبيق الأندرويد + حاوية مصفوفة الصلاحيات
+
+Work Log:
+- **إصلاح حرج — خيارات اللغة لا تستجيب** (`src/components/LanguageSwitcher.jsx`):
+  * السبب الجذري: القائمة تُعرض عبر `createPortal` إلى `<body>` (حل v1.6.0 لقص الشريط الجانبي)، لكن معالج النقر الخارجي (`mousedown`) كان يفحص `wrapRef` فقط (حاوية الزر في شجرة React) — القائمة المنقولة ليست داخله، فأي ضغطة على خيار تُغلق القائمة **قبل** وصول `click` (تسلسل المتصفح: mousedown→mouseup→click) فلا يُنفَّذ `setLanguage` إطلاقاً.
+  * الإصلاح: `menuRef` جديدة على حاوية القائمة المنقولة + فحصها في المعالج قبل الإغلاق (`wrapRef` أو `menuRef` = داخل المبدّل). يمس كل المبدّلات (Layout/PublicLayout/Shop/Login).
+- **إصلاح حرج — دخول الأندرويد يفشل** (المصادقة تظهر «فشل الاتصال بالخادم»):
+  * السبب الجذري (مُتحقَّق من كود Capacitor 6 مباشرة في `node_modules/@capacitor/android`): `WebViewLocalServer.java` يقرأ `CapacitorHttp.enabled` بافتراض **false** ← `window.fetch` غير مُرقَّع ← طلبات WebView تخضع لـCORS الكامل ← أصل التطبيق `https://localhost` (androidScheme) غير مدرج في قائمة الخادم ← حجب كل طلبات API.
+  * إصلاح الخادم (`server/src/index.js`): `CAPACITOR_ORIGINS` = `https://localhost` (أندرويد) + `http://localhost` + `capacitor://localhost` (iOS) + `ionic://localhost` — تُقبل في `originAllowed`. آمن: Origin لا تُنتحل من متصفحات الويب، والأصل المحلي لا يصدر إلا من التطبيق على جهاز المستخدم.
+  * إصلاح التطبيق (`capacitor.config.json`): `CapacitorHttp.enabled: true` ← APK القادم يمرر الطلبات عبر OkHttp الأصلية (لا CORS أصلاً)؛ POST عبر nativePromise وGET عبر وكيل `_capacitor_http_interceptor_` بنفس الأصل (تحقق من native-bridge.js وWebViewLocalServer.java).
+- **إعادة بناء مصفوفة الصلاحيات** (`src/pages/Platform.jsx`):
+  * المشاكل: شبكة نصوص `inline-grid` بلا حدود/رؤوس (غير واضحة)، أعمدة متفاوتة حسب طول النص (مشوهة)، عمود المستخدمين يعرض `users` خاماً (المفتاح غير موجود في i18n!)، وقوائم الأدوار يدوية **مخالفة لـ`PERMISSIONS`** (المخزون يظهر للمدير/المالك فقط بينما الفعلي يشمل المحاسب والصيدلاني).
+  * الإصلاح: جدول `<table className="table">` داخل `.table-container` (رؤوس بخلفية، divide-y، تحويم صفوف — كلها مغطاة بطبقة `.dark` المركزية)، رموز ✓/✕ بدوائر ملونة + مفتاح رموز، `min-w-[560px]` مع تمرير أفقي على الهاتف، والأعمدة مشتقة من `roleHasPermission(role, permission)` مباشرة (inventory.view / pos.use / reports.view / users.view / platform.manage) — لا تكرار يدوي بعد اليوم.
+
+Testing (سكربت Playwright واحد يشغّل الخادم الحقيقي + vite preview + متصفحاً حقيقياً — `/home/z/my-project/scripts/test-v1.6.1.cjs` — النتيجة **21/21 ✅**):
+- **نقر حقيقي بالفأرة** (mouse.move→down→up — التسلسل الذي كان يكشف الخلل): عربي→فرنسي→عربي على صفحة الدخول (dir/lang يتغيران فعلياً)، عربي→إنجليزي من الشريط الجانبي بعد الدخول (رؤوس المصفوفة إنجليزية: Role/Inventory/Point of Sale/Reports/Manage Users/Platform)، وعربي→إنجليزي على هاتف 390×844. موثوقية 5/5 في تكرار سريع متعاقب.
+- **CORS على كود الخادم الحقيقي** (قاعدة SQLite مؤقتة + JWT فعلي): preflight من `https://localhost` → `ACAO: https://localhost` ✅، دخول POST فعلي بترويسة التطبيق → 200 + JWT ✅، `capacitor://localhost` مسموح ✅، `https://evil.example` **ما يزال مرفوضاً** ✅ (الأمان محفوظ).
+- **المصفوفة**: رؤوس عربية صحيحة، 5 صفوف أدوار، أعداد ✓/✕ مطابقة لـPERMISSIONS (مخزون 4/1، بيع 4/1، تقارير 4/1، مستخدمون 2/3، منصة 1/4)، صفر تجاوز أفقي، الوضع القاتم: رأس الجدول `rgb(23,32,51)`، لقطات: test-matrix-light/dark.png وtest-login-mobile.png.
+- دخول superadmin كامل عبر الخادم الحقيقي → /platform ← صفر أخطاء كونسول في كل السيناريوهات.
+
+Deployment:
+- Commit مع هذا التحديث → GitHub `main` (Cloudflare Pages يبني تلقائياً).
+- سير android-release ينطلق تلقائياً (تغيير capacitor.config.json + src/**) → APK جديد بـCapacitorHttp مفعّل → الرابط الدائم https://phmp-download.pages.dev/PharmaCare-Pro.apk
+- Vercel: نشر يدوي عبر `scripts/vercel-deploy.mjs` برمز المالك (القناة المعتمدة).
+- ⚠️ **للمساعد المحلي (إلزامي)**: هذا الإصدار يتضمن تغييراً في `server/src/index.js` — نفّذ `git pull` ثم `phmp-guard.sh restart` حتى يعمل دخول الأندرويد مع النسخ المثبتة حالياً (قبل بناء APK الجديد).
+
+Stage Summary:
+- الخللان الحرجان (اللغة + الأندرويد) أُصيلا من جذورهما ومثبتان رقمياً، والمصفوفة صارت جدولاً واضحاً مشتقاً من مصدر الحقيقة.
+- ينتظر: سحب المساعد المحلي وإعادة تشغيل الحارس، وتحقق المالك من الدخول من تطبيق الأندرويد المثبت حالياً.
 
 ### أولويات العمل القادمة (مرشحة — لاتخذها إلا بتكليف من المالك)
 - [x] ربط تسجيل الدخول بالخادم المحلي (JWT) بدل mockData ✅ منجز في v1.5.0 (Task 6)

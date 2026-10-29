@@ -10,6 +10,10 @@ import { Globe, Check } from 'lucide-react'
 // القائمة تحسب موضعها من موضع الزر: تفتح للأسفل إن توفرت مساحة،
 // وللأعلى إن كان الزر قريبا من أسفل الشاشة (إصلاح القص في الشريط الجانبي)،
 // وتُثبَّت دائما داخل حدود الشاشة (fixed) مع إغلاق عند التمرير/Escape.
+// ⚠️ إصلاح حرج: القائمة تُعرض عبر createPortal إلى body (خارج wrapRef)،
+// لذا يجب أن يفحص كاشف النقر الخارجي القائمة نفسها (menuRef) أيضا —
+// وإلا فإن mousedown على أي خيار يُغلق القائمة قبل وصول حدث click
+// إليه فلا تستجيب الخيارات إطلاقا (خلل «الإختيارات لا تستجيب»).
 // =====================================================================
 
 const MENU_W = 176   // w-44
@@ -22,6 +26,7 @@ const LanguageSwitcher = ({ variant = 'pill' }) => {
   const [menuPos, setMenuPos] = useState(null)
   const btnRef = useRef(null)
   const wrapRef = useRef(null)
+  const menuRef = useRef(null) // حاوية القائمة المنقولة إلى body
 
   const toggle = () => {
     if (open) { setOpen(false); return }
@@ -48,7 +53,12 @@ const LanguageSwitcher = ({ variant = 'pill' }) => {
   useEffect(() => {
     if (!open) return
     const onClick = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+      // الزر الأصلي (wrapRef) أو القائمة المنقولة (menuRef) كلاهما «داخل»
+      // المبدّل — النقر على أي منهما ليس نقرا خارجياً ولا يُغلق القائمة
+      // قبل أن يُكمل الحدث مساره (click) على الخيار المضغوط.
+      if (wrapRef.current?.contains(e.target)) return
+      if (menuRef.current?.contains(e.target)) return
+      setOpen(false)
     }
     const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
     // إغلاق عند التمرير أو تغيير الحجم كي لا تنفصل القائمة عن زرها (fixed)
@@ -89,6 +99,8 @@ const LanguageSwitcher = ({ variant = 'pill' }) => {
           يحوّل fixed إلى تموضع نسبي له فتخرج القائمة عن حدود الشاشة */}
       {open && menuPos && createPortal(
         <div
+          ref={menuRef}
+          data-lang-menu
           className="fixed z-[60] bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-slide-up"
           style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
         >

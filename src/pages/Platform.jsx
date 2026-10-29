@@ -1,8 +1,8 @@
-import { useState, useEffect, Fragment, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { api } from '../lib/api'
 import { NoPermission } from '../components/PermissionGate'
-import { ROLE_INFO } from '../config/permissions'
+import { ROLE_INFO, roleHasPermission } from '../config/permissions'
 import {
   Crown, Building2, Users, TrendingUp, ShoppingCart, Plus, Trash2, Pencil,
   History, ShieldCheck, X, Check, ChevronDown, Activity
@@ -250,6 +250,16 @@ const Platform = () => {
     return info ? (language === 'ar' ? info.ar : info.en) : role
   }
 
+  // مصفوفة الصلاحيات — مشتقة مباشرة من PERMISSIONS (مصدر الحقيقة الوحيد)
+  // لا تُكتب قوائم الأدوار يدوياً هنا كي لا تنحرف عن السلوك الفعلي للتطبيق
+  const matrixColumns = [
+    { key: 'inventory', label: t('inventory'), permission: 'inventory.view' },
+    { key: 'pos', label: t('pos'), permission: 'pos.use' },
+    { key: 'reports', label: t('reports'), permission: 'reports.view' },
+    { key: 'users', label: t('manageUsers'), permission: 'users.view' },
+    { key: 'platform', label: t('platform'), permission: 'platform.manage' },
+  ]
+
   const formatTime = (iso) => {
     try {
       const d = new Date(iso)
@@ -352,32 +362,62 @@ const Platform = () => {
             </div>
           </div>
 
-          {/* Roles matrix */}
+          {/* Roles matrix — جدول حقيقي بحدود ورؤوس واضحة مشتق من PERMISSIONS */}
           <div className="card p-4 lg:p-6">
-            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-violet-600" />
-              {t('rolesMatrix')}
-            </h3>
-            <div className="overflow-x-auto -mx-4 lg:mx-0">
-              <div className="inline-grid grid-cols-5 gap-1 min-w-full px-4 lg:px-0 text-xs">
-                <div className="font-semibold text-gray-500 p-2">{t('role')}</div>
-                {[t('totalProducts'), t('pos'), t('reports'), t('users'), t('platform')].map((h, i) => (
-                  <div key={i} className="font-semibold text-gray-500 p-2 text-center">{h}</div>
-                ))}
-                {Object.entries(ROLE_INFO).map(([role, info]) => (
-                  <Fragment key={role}>
-                    <div className="p-2 font-medium text-gray-900 flex items-center gap-1">
-                      <span>{info.badge}</span>
-                      <span className="hidden sm:inline">{language === 'ar' ? info.shortAr : info.shortEn}</span>
-                    </div>
-                    <div className={`p-2 text-center ${role === 'admin' || role === 'super_admin' ? 'text-emerald-600' : 'text-gray-400'}`}>{(role === 'admin' || role === 'super_admin') ? '✓' : '—'}</div>
-                    <div className={`p-2 text-center ${['super_admin', 'admin', 'pharmacist', 'cashier'].includes(role) ? 'text-emerald-600' : 'text-gray-400'}`}>{['super_admin', 'admin', 'pharmacist', 'cashier'].includes(role) ? '✓' : '—'}</div>
-                    <div className={`p-2 text-center ${['super_admin', 'admin', 'accountant', 'pharmacist'].includes(role) ? 'text-emerald-600' : 'text-gray-400'}`}>{['super_admin', 'admin', 'accountant', 'pharmacist'].includes(role) ? '✓' : '—'}</div>
-                    <div className={`p-2 text-center ${['super_admin', 'admin'].includes(role) ? 'text-emerald-600' : 'text-gray-400'}`}>{['super_admin', 'admin'].includes(role) ? '✓' : '—'}</div>
-                    <div className={`p-2 text-center ${role === 'super_admin' ? 'text-emerald-600' : 'text-gray-400'}`}>{role === 'super_admin' ? '✓' : '—'}</div>
-                  </Fragment>
-                ))}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-violet-600" />
+                {t('rolesMatrix')}
+              </h3>
+              {/* مفتاح الرموز */}
+              <div className="flex items-center gap-4 text-xs text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-50">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  </span>
+                  {language === 'ar' ? 'مسموح' : language === 'fr' ? 'Autorisé' : 'Allowed'}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100">
+                    <X className="w-3 h-3 text-gray-400" />
+                  </span>
+                  {language === 'ar' ? 'غير مسموح' : language === 'fr' ? 'Refusé' : 'Denied'}
+                </span>
               </div>
+            </div>
+            <div className="table-container">
+              <table className="table min-w-[560px]">
+                <thead>
+                  <tr>
+                    <th className="min-w-[140px]">{t('role')}</th>
+                    {matrixColumns.map(col => (
+                      <th key={col.key} className="text-center whitespace-nowrap">{col.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(ROLE_INFO).map(([role, info]) => (
+                    <tr key={role}>
+                      <td className="font-medium">
+                        <span className="me-1.5">{info.badge}</span>
+                        {language === 'ar' ? info.ar : language === 'fr' ? (info.fr || info.en) : info.en}
+                      </td>
+                      {matrixColumns.map(col => {
+                        const allowed = roleHasPermission(role, col.permission)
+                        return (
+                          <td key={col.key} className="text-center">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${allowed ? 'bg-emerald-50' : 'bg-gray-100'}`}>
+                              {allowed
+                                ? <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                : <X className="w-3.5 h-3.5 text-gray-400" />}
+                            </span>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             <p className="text-xs text-gray-500 mt-3">
               {isRTL

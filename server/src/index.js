@@ -46,13 +46,24 @@ app.disable('x-powered-by')
 app.use(express.json({ limit: '50mb' }))
 
 // ===== الأصول المسموحة (CORS) =====
+// أصول Capacitor (تطبيق أندرويد/iOS): WebView يحمّل الواجهة من https://localhost
+// (androidScheme: https) — بدون إدراجها هنا يحجب CORS كل طلبات الدخول من التطبيق
+// فيفشل تسجيل الدخول. آمنة: متصفحات الويب لا تستطيع انتحال ترويسة Origin،
+// وأصل localhost لا يصدر إلا من التطبيق المثبّت على جهاز المستخدم نفسه.
+const CAPACITOR_ORIGINS = [
+  'https://localhost',   // أندرويد (androidScheme: https — الافتراضي في Capacitor 6)
+  'http://localhost',    // إعدادات أندرويد القديمة (androidScheme: http)
+  'capacitor://localhost', // iOS (المخطط الافتراضي)
+  'ionic://localhost',   // توافق مع حزم Ionic القديمة
+]
+
 const ALLOWED_ORIGINS = (process.env.PHMP_ALLOWED_ORIGINS ||
   'https://phmp.pages.dev,https://phmplatform.vercel.app,https://pharmacare-pro-jade.vercel.app')
   .split(',').map((s) => s.trim()).filter(Boolean)
 
 const originAllowed = (origin) => {
   if (!origin) return true // curl / تطبيق أصلي بلا Origin
-  if (ALLOWED_ORIGINS.includes(origin)) return true
+  if (ALLOWED_ORIGINS.includes(origin) || CAPACITOR_ORIGINS.includes(origin)) return true
   try {
     const host = new URL(origin).hostname
     // معاينات Pages التابعة لنفس المشروع
