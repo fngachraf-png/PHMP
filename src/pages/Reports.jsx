@@ -12,6 +12,13 @@ import {
 import { getChartTheme, compactNumber } from '../lib/chartTheme'
 import { exportToCSV, money } from '../lib/exportUtils'
 import { printReport } from '../lib/print'
+import { pickItemName } from '../i18n/translations'
+
+// لوغو الجهة المصدرة للتقرير: لوغو الصيدلية إن توفر، وإلا لوغو المنصة
+const reportLogoSrc = (pharmacy) => {
+  const l = pharmacy?.logo
+  return typeof l === 'string' && l.startsWith('data:image') ? l : '/logo.png'
+}
 
 // =====================================================================
 // صفحة التقارير — مؤشرات قابلة للقياس مبنية على بيانات الفواتير
@@ -109,16 +116,14 @@ const Reports = () => {
   }, [productsData])
 
   const productStats = useMemo(() => {
-    // حل اسم الدواء حسب لغة الواجهة (إصلاح الترجمة في الرسوم):
+    // حل اسم الدواء حسب لغة الواجهة (لغة واحدة موحدة داخل التقرير):
     // نبحث عن المنتج الأصلي في قاعدة البيانات (بمعرف productId) ونستعمل
     // pickName الذي يختار الاسم المناسب للغة (name/nameAr/nameFr/nameEn)،
-    // وإن لم نجد المنتج نستعمل حقول سطر البيع نفسه بنفس سلسلة الأولويات.
+    // وإن لم نجد المنتج نستعمل مرادفات سطر البيع نفسه بنفس سلسلة الأولويات.
     const resolveName = (item) => {
       const product = item.productId ? productsData.find((p) => p.id === item.productId) : null
       if (product) return pickName(product)
-      if (language === 'ar') return item.name || item.nameAr || item.nameEn || item.nameFr || ''
-      if (language === 'fr') return item.nameFr || item.nameEn || item.name || item.nameAr || ''
-      return item.nameEn || item.nameFr || item.name || item.nameAr || ''
+      return pickItemName(item, language)
     }
     const map = {}
     periodSales.forEach((sale) => {
@@ -229,6 +234,17 @@ const Reports = () => {
   )
 
   // ===== بيانات التصدير والطباعة حسب التبويب =====
+  // تسميات موحدة بلغة الواجهة: طريقة الدفع واسم الزبون يُحلّان لغوياً
+  // حتى لا يخرج ملف CSV بلغات مختلطة (ترويسة فرنسية + قيم إنجليزية...)
+  const payLabel = (m) => {
+    if (!m) return '-'
+    const label = t(m)
+    return label !== m ? label : m
+  }
+  const customerLabel = (c) => {
+    if (!c) return '-'
+    return pickName(c) || c.name || c.fullName || '-'
+  }
   const getExportData = () => {
     if (activeReport === 'sales') {
       return {
@@ -248,8 +264,8 @@ const Reports = () => {
           .map((s) => [
             s.number,
             s.date,
-            s.customer?.name || '-',
-            s.paymentMethod,
+            customerLabel(s.customer),
+            payLabel(s.paymentMethod),
             (s.items || []).reduce((n, i) => n + i.quantity, 0),
             Number(s.total || 0).toFixed(2),
           ]),
@@ -457,7 +473,7 @@ const Reports = () => {
                 <BarChart data={productStats.slice(0, 8)} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={chart.gridColor} />
                   <XAxis type="number" stroke={chart.axisColor} fontSize={11} tickLine={false} tickFormatter={compactNumber} />
-                  <YAxis type="category" dataKey="name" stroke={chart.axisColor} fontSize={11} width={120} tickFormatter={(s) => truncate(s, 14)} />
+                  <YAxis type="category" dataKey="name" stroke={chart.axisColor} fontSize={11} width={150} tickFormatter={(s) => truncate(s, 20)} />
                   <Tooltip contentStyle={chart.tooltipStyle} itemStyle={chart.tooltipItemStyle} formatter={(v) => money(v)} />
                   <Bar dataKey="revenue" name={t('netRevenue')} fill="#10b981" radius={[0, 6, 6, 0]} barSize={18} />
                 </BarChart>
@@ -496,8 +512,8 @@ const Reports = () => {
                           <tr key={s.id}>
                             <td className="font-semibold text-primary-700">{s.number}</td>
                             <td>{s.date}{s.time ? ` • ${s.time}` : ''}</td>
-                            <td className="max-w-[180px] truncate">{s.customer?.name || '-'}</td>
-                            <td>{t(s.paymentMethod) !== s.paymentMethod ? t(s.paymentMethod) : s.paymentMethod}</td>
+                            <td className="max-w-[180px] truncate">{customerLabel(s.customer)}</td>
+                            <td>{payLabel(s.paymentMethod)}</td>
                             <td>{(s.items || []).reduce((n, i) => n + i.quantity, 0)}</td>
                             <td className="font-bold tabular-nums">{money(s.total)}</td>
                           </tr>
@@ -518,7 +534,7 @@ const Reports = () => {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-gray-900">{s.number}</p>
                           <p className="text-xs text-gray-500 truncate">
-                            {s.date} • {s.customer?.name || '-'} • {t(s.paymentMethod) !== s.paymentMethod ? t(s.paymentMethod) : s.paymentMethod}
+                            {s.date} • {customerLabel(s.customer)} • {payLabel(s.paymentMethod)}
                           </p>
                         </div>
                         <p className="text-sm font-extrabold text-gray-900 tabular-nums">{money(s.total)}</p>
@@ -688,15 +704,30 @@ const Reports = () => {
       )}
 
       {/* ===== منطقة طباعة التقرير A4 (لا تظهر على الشاشة — فقط عند الطباعة) ===== */}
-      <div className="report-print-area" dir={isRTL ? 'rtl' : 'ltr'}>
-        <div style={{ textAlign: 'center', borderBottom: '2px solid #111827', paddingBottom: 12, marginBottom: 16 }}>
+      <div className="report-print-area" dir={isRTL ? 'rtl' : 'ltr'} style={{ position: 'relative' }}>
+        {/* علامة مائية: لوغو الصيدلية إن توفر وإلا لوغو المنصة */}
+        <img
+          src={reportLogoSrc(currentPharmacy)}
+          alt=""
+          aria-hidden="true"
+          style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            width: 380, maxWidth: '60%', opacity: 0.06, pointerEvents: 'none', userSelect: 'none',
+          }}
+        />
+        <div style={{ textAlign: 'center', borderBottom: '2px solid #111827', paddingBottom: 12, marginBottom: 16, position: 'relative' }}>
+          <img
+            src={reportLogoSrc(currentPharmacy)}
+            alt=""
+            style={{ width: 52, height: 52, objectFit: 'contain', margin: '0 auto 6px', display: 'block' }}
+          />
           <div style={{ fontSize: 22, fontWeight: 800 }}>{pharmacyName}</div>
           <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>{activeMeta.label}</div>
           <div style={{ fontSize: 12, marginTop: 4 }}>
             {t('reportPeriod')}: {periodLabel} • {t('generatedOn')}: {new Date().toLocaleString(isRTL ? 'ar-MA' : language === 'fr' ? 'fr-FR' : 'en-GB')} • {t('currency')}: MAD
           </div>
         </div>
-        <table style={{ width: '100%', fontSize: 12, marginBottom: 16 }}>
+        <table style={{ width: '100%', fontSize: 12, marginBottom: 16, position: 'relative' }}>
           <tbody>
             {[0, 1, 2, 3, 4, 5].filter((i) => exportData.kpis[i]).reduce((acc, i) => {
               if (i % 2 === 0) acc.push([exportData.kpis[i], exportData.kpis[i + 1]])

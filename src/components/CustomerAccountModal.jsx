@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useApp } from '../contexts/AppContext'
 import PhotoUpload from './PhotoUpload'
+import LogoUpload from './LogoUpload'
+import SmartAvatar from './SmartAvatar'
 import { X, UserRound, UserRoundCheck, BadgeCheck, CircleCheck, LogIn } from 'lucide-react'
 
 // =====================================================================
@@ -16,6 +18,7 @@ const CustomerAccountModal = ({ open, onClose }) => {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [idPhoto, setIdPhoto] = useState(null)
+  const [photo, setPhoto] = useState(null) // صورة الزبون (اختيارية)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
 
@@ -26,7 +29,7 @@ const CustomerAccountModal = ({ open, onClose }) => {
 
   const close = () => {
     setMode('choose'); setError(''); setDone(false)
-    setFullName(''); setPhone(''); setIdPhoto(null)
+    setFullName(''); setPhone(''); setIdPhoto(null); setPhoto(null)
     onClose()
   }
 
@@ -44,7 +47,7 @@ const CustomerAccountModal = ({ open, onClose }) => {
       setDone('login')
     } else if (mode === 'register') {
       if (!idPhoto) return setError(t('idPhotoRequired'))
-      const res = registerCustomer({ fullName: fullName.trim(), phone: phone.trim(), idPhoto })
+      const res = registerCustomer({ fullName: fullName.trim(), phone: phone.trim(), idPhoto, photo })
       if (!res.ok) return setError(t(res.error))
       setDone('register')
     }
@@ -128,13 +131,24 @@ const CustomerAccountModal = ({ open, onClose }) => {
               </div>
 
               {mode === 'register' && (
-                <PhotoUpload
-                  value={idPhoto}
-                  onChange={(v) => setIdPhoto(v)}
-                  label={t('uploadIdPhoto')}
-                  hint={t('idDocumentHint')}
-                  required
-                />
+                <>
+                  {/* صورة الزبون (اختيارية) — تظهر في حسابه وطلباته */}
+                  <LogoUpload
+                    value={photo}
+                    onChange={(img) => setPhoto(img)}
+                    label={t('customerPhoto')}
+                    hint={t('customerPhotoHint')}
+                    size={72}
+                    rounded="rounded-full"
+                  />
+                  <PhotoUpload
+                    value={idPhoto}
+                    onChange={(v) => setIdPhoto(v)}
+                    label={t('uploadIdPhoto')}
+                    hint={t('idDocumentHint')}
+                    required
+                  />
+                </>
               )}
 
               {mode === 'login' && customerAccounts.length > 0 && (
@@ -144,8 +158,8 @@ const CustomerAccountModal = ({ open, onClose }) => {
                     {customerAccounts.slice(-3).reverse().map(acc => (
                       <button key={acc.id} type="button"
                         onClick={() => { setFullName(acc.fullName); setPhone(acc.phone) }}
-                        className="w-full text-start px-2 py-1.5 rounded hover:bg-white text-sm">
-                        👤 {acc.fullName} — <span dir="ltr">{acc.phone}</span>
+                        className="w-full text-start px-2 py-1.5 rounded hover:bg-white text-sm flex items-center gap-2">
+                        <SmartAvatar value={acc.photo} alt={acc.fullName} size={24} rounded="rounded-full" textClass="text-base" fallback="👤" /> {acc.fullName} — <span dir="ltr">{acc.phone}</span>
                       </button>
                     ))}
                   </div>

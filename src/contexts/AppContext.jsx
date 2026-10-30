@@ -12,6 +12,68 @@ const TOP_DRUGS_COUNT = 200
 
 const AppContext = createContext()
 
+// =====================================================================
+// ترحيل البيانات المحلية القديمة (إصلاح جذري لخلل اللغة المختلطة في التقارير):
+// مبيعات العرض القديمة (v≤1.6) كانت تحفظ اسماً عربياً واحداً ومعرفات منتجات
+// وهمية (p1..p20) لم تعد موجودة في قاعدة الأدوية الرسمية — فظهرت أسماء
+// عربية داخل تقارير/مخططات FR وEN رغم إصلاح v1.7 للبيانات الجديدة فقط.
+// الحل الجذري: ترحيل مرة واحدة عند الإقلاع —
+//  1) إن كانت قائمة المنتجات المحفوظة هي مجموعة العرض القديمة حصراً
+//     (p1..p20 بلا أي منتج حقيقي) تُستبدل بالأدوية الرسمية.
+//  2) كل بند عرضي في المبيعات غير مرتبط بمنتج قائم يُعاد ربطه بدواء
+//     رسمي (بترتيب حتمي ثابت) مع كل مرادفات الاسم بالثلاث لغات، وتُعاد
+//     حساب المجاميع. المبيعات الحقيقية (sale-<timestamp>) لا تُمس أبداً.
+// =====================================================================
+const DATA_VERSION = '1.8.0'
+
+const migrateStoredData = (storedProducts, storedSales, fallbackProducts, officialDrugs) => {
+  let products = storedProducts
+  let sales = storedSales
+  let changed = false
+
+  // (1) قائمة منتجات تجريبية خالصة (p1..p20) ← الأدوية الرسمية
+  if (Array.isArray(products) && products.length > 0 &&
+      products.every(p => /^p\d+$/.test(String(p?.id || ''))) && products.length <= 30) {
+    products = fallbackProducts
+    changed = true
+  }
+
+  // (2) إعادة ربط بنود العرض القديمة بأدوية رسمية
+  const productIds = new Set((products || []).map(p => p.id))
+  const pool = (officialDrugs || []).filter(d => d.price > 0)
+  if (Array.isArray(sales) && sales.length > 0 && pool.length > 0) {
+    sales = sales.map((sale, si) => {
+      const isLegacyMock = /^sale-\d{1,3}$/.test(String(sale?.id || ''))
+      if (!isLegacyMock || !Array.isArray(sale.items)) return sale
+      const needsFix = sale.items.some(it => !it.productId || !productIds.has(it.productId))
+      if (!needsFix) return sale
+      changed = true
+      const items = sale.items.map((it, ji) => {
+        if (it.productId && productIds.has(it.productId)) return it
+        const p = pool[(si * 7 + ji * 13) % pool.length]
+        const qty = it.quantity || 1
+        return {
+          ...it,
+          productId: p.id,
+          name: p.nameAr || p.name,
+          nameAr: p.nameAr || p.name,
+          nameEn: p.nameEn || p.name,
+          nameFr: p.nameFr || p.nameEn || p.name,
+          price: p.price,
+          quantity: qty,
+          total: Number((p.price * qty).toFixed(2)),
+        }
+      })
+      const subtotal = Number(items.reduce((s, it) => s + it.total, 0).toFixed(2))
+      const discount = (sale.discount || 0) > 0 ? Number((subtotal * 0.1).toFixed(2)) : 0
+      const tax = Number((subtotal * 0.05).toFixed(2))
+      return { ...sale, items, subtotal, tax, discount, total: Number((subtotal + tax - discount).toFixed(2)) }
+    })
+  }
+
+  return changed ? { products, sales } : null
+}
+
 export const useApp = () => {
   const context = useContext(AppContext)
   if (!context) throw new Error('useApp must be used within AppProvider')
@@ -47,11 +109,41 @@ export const AppProvider = ({ children }) => {
   const defaultProducts = useMemo(() => {
     return moroccanDrugs.filter(d => d.price > 0).slice(0, TOP_DRUGS_COUNT)
   }, [])
-  const [productsData, setProductsData] = useState(() => loadState('products', defaultProducts))
+
+  // ===== ترحيل البيانات القديمة مرة واحدة عند الإقلاع (إن لزم) =====
+  // يُنفَّذ قبل إنشاء الحالات حتى لا يومض المحتوى القديم على الشاشة.
+  const migratedRef = useMemo(() => {
+    try {
+      const version = loadState('dataVersion', null)
+      if (version === DATA_VERSION) return null
+      const storedProducts = loadState('products', null)
+      const storedSales = loadState('sales', null)
+      const result = migrateStoredData(storedProducts, storedSales, defaultProducts, moroccanDrugs)
+      if (result) {
+        if (result.products !== storedProducts) {
+          localStorage.setItem('pharmacare_products', JSON.stringify(result.products))
+        }
+        if (result.sales !== storedSales) {
+          localStorage.setItem('pharmacare_sales', JSON.stringify(result.sales))
+        }
+        return result
+      }
+      return null
+    } catch {
+      return null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const [productsData, setProductsData] = useState(() => migratedRef?.products || loadState('products', defaultProducts))
   const [customersData, setCustomersData] = useState(() => loadState('customers', customers))
   const [suppliersData, setSuppliersData] = useState(() => loadState('suppliers', suppliers))
   const [prescriptionsData, setPrescriptionsData] = useState(() => loadState('prescriptions', prescriptions))
-  const [salesData, setSalesData] = useState(() => loadState('sales', sales))
+  const [salesData, setSalesData] = useState(() => migratedRef?.sales || loadState('sales', sales))
+  // تعليم إصدار البيانات الحالي بعد الإقلاع (يمنع تكرار الترحيل)
+  useEffect(() => {
+    try { localStorage.setItem('pharmacare_dataVersion', JSON.stringify(DATA_VERSION)) } catch { /* تجاهل */ }
+  }, [])
   const [notifications, setNotifications] = useState([])
   // المستخدمون (قابلون للإدارة من طرف السوبر أدمين والأدمن)
   const [usersData, setUsersData] = useState(() => loadState('usersData', defaultUsers))
@@ -238,6 +330,7 @@ export const AppProvider = ({ children }) => {
         if (updates.role !== undefined) payload.role = updates.role
         if (updates.pharmacyId !== undefined) payload.pharmacyId = updates.pharmacyId
         if (updates.active !== undefined) payload.active = updates.active
+        if (updates.avatar !== undefined) payload.avatar = updates.avatar
         if (updates.password) payload.password = updates.password
         await api.updateUserRemote(id, payload)
       } catch (err) {
@@ -427,7 +520,7 @@ export const AppProvider = ({ children }) => {
   // التسجيل: الاسم الكامل + رقم الهاتف + صورة واضحة لوثيقة الهوية
   // (البطاقة الوطنية أو جواز السفر أو رخصة السياقة) — محفوظة محلياً
   // =====================================================================
-  const registerCustomer = ({ fullName, phone, idPhoto, address }) => {
+  const registerCustomer = ({ fullName, phone, idPhoto, photo, address }) => {
     const exists = customerAccounts.some(c => c.phone === phone)
     if (exists) return { ok: false, error: 'phoneTaken' }
     const account = {
@@ -435,6 +528,7 @@ export const AppProvider = ({ children }) => {
       fullName,
       phone,
       idPhoto: idPhoto || null, // صورة وثيقة الهوية (base64 مضغوط)
+      photo: photo || null,     // صورة الزبون الشخصية (base64 مضغوط)
       address: address || '',
       memberSince: new Date().toISOString(),
     }

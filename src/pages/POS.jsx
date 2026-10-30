@@ -61,7 +61,9 @@ const POS = () => {
       setCart([...cart, {
         productId: product.id,
         name: product.name,
+        nameAr: product.nameAr || product.name,
         nameEn: product.nameEn,
+        nameFr: product.nameFr || product.nameEn || product.name,
         price: product.price,
         quantity: 1,
         maxStock: product.stock,

@@ -9,6 +9,24 @@ import { useApp } from '../contexts/AppContext'
 import { ROLE_INFO } from '../config/permissions'
 import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
+import SmartAvatar, { isImage } from './SmartAvatar'
+
+// علامة مائية خفيفة للوغو المنصة على جميع صفحات التطبيق
+// (غير تفاعلية — لا تؤثر على القراءة ولا تظهر في الطباعة)
+const PlatformWatermark = ({ isRTL }) => (
+  <img
+    src="/logo-watermark.png"
+    alt=""
+    aria-hidden="true"
+    className="fixed z-0 pointer-events-none select-none print:hidden"
+    style={{
+      bottom: '4%',
+      [isRTL ? 'left' : 'right']: '4%',
+      width: 'clamp(120px, 18vw, 220px)',
+      opacity: 0.05,
+    }}
+  />
+)
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { t, isRTL, currentPharmacy, currentUser, logout, language, hasPermission, isSuperAdmin, activePharmacyId, switchPharmacy, pharmaciesData, serverStatus, visibleOrders, pickName } = useApp()
@@ -89,7 +107,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             >
               <option value="all">👑 {t('allPharmacies')}</option>
               {pharmaciesData.map(ph => (
-                <option key={ph.id} value={ph.id}>{ph.logo} {pickName(ph)}</option>
+                <option key={ph.id} value={ph.id}>{isImage(ph.logo) ? '🏥' : ph.logo} {pickName(ph)}</option>
               ))}
             </select>
           </div>
@@ -100,7 +118,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           <div className="px-4 py-4 border-b border-gray-200">
             <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-2xl">{currentPharmacy.logo}</span>
+                <SmartAvatar value={currentPharmacy.logo} alt={pickName(currentPharmacy)} size={34} rounded="rounded-lg" fallback="💊" textClass="text-2xl" className="bg-white" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-gray-900 truncate">
                     {pickName(currentPharmacy)}
@@ -161,9 +179,14 @@ const Sidebar = ({ isOpen, onClose }) => {
         {/* User section */}
         <div className="px-4 py-4 border-t border-gray-200">
           <div className="flex items-center gap-3 mb-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${currentUser?.role === 'super_admin' ? 'bg-gradient-to-br from-violet-500 to-violet-700' : 'bg-gradient-to-br from-primary-500 to-primary-700'}`}>
-              {currentUser?.avatar}
-            </div>
+            <SmartAvatar
+              value={currentUser?.avatar}
+              alt={currentUser?.name}
+              size={40}
+              rounded="rounded-full"
+              textClass="text-xl"
+              className={currentUser?.role === 'super_admin' ? 'bg-gradient-to-br from-violet-500 to-violet-700' : 'bg-gradient-to-br from-primary-500 to-primary-700'}
+            />
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm text-gray-900 truncate">{currentUser?.name}</p>
               <p className="text-xs text-gray-500">
@@ -383,7 +406,8 @@ const Layout = ({ children }) => {
   return (
     <div className={`min-h-[100dvh] bg-gray-50 ${isRTL ? 'lg:mr-72' : 'lg:ml-72'}`}>
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex flex-col min-h-[100dvh]">
+      <PlatformWatermark isRTL={isRTL} />
+      <div className="flex flex-col min-h-[100dvh] relative z-[1]">
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6">
           <div className="animate-fade-in">

@@ -108,8 +108,8 @@ const Login = () => {
         {/* Left side - branding */}
         <div className="hidden lg:block space-y-6 animate-slide-up">
           <div className="flex items-center gap-3">
-            <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center shadow-2xl shadow-primary-500/40">
-              <Stethoscope className="w-9 h-9 text-white" />
+            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white border border-primary-100 flex items-center justify-center shadow-2xl shadow-primary-500/40">
+              <img src="/logo.png" alt="PHMP" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">{t('appShortName')}</h1>
@@ -157,8 +157,8 @@ const Login = () => {
         <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl border border-white/40 dark:border-white/10 p-8 lg:p-10 animate-slide-up">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
-              <Stethoscope className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-primary-100 flex items-center justify-center shadow-lg">
+              <img src="/logo.png" alt="PHMP" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">{t('appShortName')}</h1>

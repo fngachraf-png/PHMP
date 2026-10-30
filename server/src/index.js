@@ -284,7 +284,7 @@ app.patch('/api/users/:id', authenticate, requireRole('super_admin', 'admin'), (
   if (target.role === 'super_admin' && req.user.role !== 'super_admin') {
     return res.status(403).json({ error: 'لا يمكن تعديل مالك المنصة' })
   }
-  const { name, role, pharmacyId, active, password } = req.body
+  const { name, role, pharmacyId, active, password, avatar } = req.body
   if (req.user.role === 'admin' && target.pharmacy_id !== req.user.pharmacyId) {
     return res.status(403).json({ error: 'لا يمكنك تعديل مستخدم من صيدلية أخرى' })
   }
@@ -297,6 +297,11 @@ app.patch('/api/users/:id', authenticate, requireRole('super_admin', 'admin'), (
   }
   const updates = {}
   if (name !== undefined) { updates.name = name; db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, target.id) }
+  // صورة المستخدم (dataURL مضغوط) أو رمز تعبيري — تُخزن في نفس الحقل
+  if (avatar !== undefined && typeof avatar === 'string' && avatar.length < 200000) {
+    updates.avatar = avatar
+    db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(avatar, target.id)
+  }
   if (role !== undefined && target.role !== 'super_admin') { updates.role = role; db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, target.id) }
   if (pharmacyId !== undefined) { updates.pharmacy_id = pharmacyId; db.prepare('UPDATE users SET pharmacy_id = ? WHERE id = ?').run(pharmacyId, target.id) }
   if (active !== undefined && target.role !== 'super_admin') { updates.active = active ? 1 : 0; db.prepare('UPDATE users SET active = ? WHERE id = ?').run(updates.active, target.id) }

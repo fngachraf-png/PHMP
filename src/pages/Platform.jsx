@@ -3,6 +3,8 @@ import { useApp } from '../contexts/AppContext'
 import { api } from '../lib/api'
 import { NoPermission } from '../components/PermissionGate'
 import { ROLE_INFO, roleHasPermission } from '../config/permissions'
+import LogoUpload from '../components/LogoUpload'
+import SmartAvatar, { isImage } from '../components/SmartAvatar'
 import {
   Crown, Building2, Users, TrendingUp, ShoppingCart, Plus, Trash2, Pencil,
   History, ShieldCheck, X, Check, ChevronDown, Activity
@@ -37,6 +39,7 @@ const UserModal = ({ user, onClose }) => {
     try {
       if (user) {
         const updates = { name: form.name, role: form.role, pharmacyId: form.pharmacyId }
+        if (isImage(form.avatar)) updates.avatar = form.avatar
         if (form.password) updates.password = form.password
         await updateUser(user.id, updates)
       } else {
@@ -58,6 +61,15 @@ const UserModal = ({ user, onClose }) => {
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
+          {/* صورة المستخدم (موظف) — اختيارية */}
+          <LogoUpload
+            value={isImage(form.avatar) ? form.avatar : null}
+            onChange={(img) => setForm({ ...form, avatar: img || '👤' })}
+            label={t('userPhoto')}
+            hint={t('userPhotoHint')}
+            size={80}
+            rounded="rounded-full"
+          />
           <div>
             <label className="label">{t('name')} *</label>
             <input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
@@ -134,6 +146,15 @@ const PharmacyModal = ({ onClose }) => {
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
+          {/* لوغو الصيدلية (صورة) — يُستعمل في الواجهة وفي الفواتير والتقارير */}
+          <LogoUpload
+            value={isImage(form.logo) ? form.logo : null}
+            onChange={(img) => setForm({ ...form, logo: img || '💊' })}
+            label={t('pharmacyLogo')}
+            hint={t('pharmacyLogoHint')}
+            size={88}
+            rounded="rounded-2xl"
+          />
           <div>
             <label className="label">{t('pharmacyName')} *</label>
             <input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="صيدلية ..." />
@@ -148,8 +169,8 @@ const PharmacyModal = ({ onClose }) => {
               <input className="input" value={form.license} onChange={e => setForm({ ...form, license: e.target.value })} placeholder="PH-2025-XXX" />
             </div>
             <div>
-              <label className="label">{language === 'ar' ? 'الرمز' : language === 'fr' ? 'Logo' : 'Logo'}</label>
-              <input className="input" value={form.logo} onChange={e => setForm({ ...form, logo: e.target.value })} />
+              <label className="label">{language === 'ar' ? 'الرمز البديل (بدون صورة)' : language === 'fr' ? 'Emoji (sans image)' : 'Emoji (no image)'}</label>
+              <input className="input" maxLength={4} value={isImage(form.logo) ? '' : form.logo} disabled={isImage(form.logo)} onChange={e => setForm({ ...form, logo: e.target.value || '💊' })} />
             </div>
           </div>
           <div>
@@ -347,7 +368,7 @@ const Platform = () => {
                 const phSales = salesData.filter(s => s.pharmacyId === ph.id || !s.pharmacyId)
                 return (
                   <div key={ph.id} className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <span className="text-2xl">{ph.logo}</span>
+                    <SmartAvatar value={ph.logo} alt={pickName(ph)} size={36} rounded="rounded-xl" fallback="💊" className="bg-white border border-gray-200" textClass="text-2xl" />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm text-gray-900 truncate">{pickName(ph)}</p>
                       <p className="text-xs text-gray-500 truncate">{ph.address} • {ph.license}</p>
@@ -456,7 +477,7 @@ const Platform = () => {
                   return (
                     <tr key={ph.id} className="hover:bg-gray-50">
                       <td className="py-3 px-2 font-medium text-gray-900">
-                        <span className="me-1">{ph.logo}</span>{pickName(ph)}
+                        <span className="inline-flex items-center gap-1.5 align-middle"><SmartAvatar value={ph.logo} alt={pickName(ph)} size={22} rounded="rounded-lg" fallback="💊" textClass="text-base" />{pickName(ph)}</span>
                       </td>
                       <td className="py-3 px-2 text-gray-600" dir="ltr">{ph.license}</td>
                       <td className="py-3 px-2 text-gray-600">{ph.address?.split('،').pop()?.trim() || '—'}</td>
@@ -477,7 +498,7 @@ const Platform = () => {
               return (
                 <div key={ph.id} className="p-4 rounded-xl border border-gray-200 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl">{ph.logo}</span>
+                    <SmartAvatar value={ph.logo} alt={pickName(ph)} size={32} rounded="rounded-lg" fallback="💊" textClass="text-2xl" />
                     <p className="font-semibold text-gray-900">{pickName(ph)}</p>
                   </div>
                   <p className="text-xs text-gray-500">{ph.address}</p>
@@ -532,7 +553,7 @@ const Platform = () => {
                     <tr key={u.id} className="hover:bg-gray-50">
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xl">{u.avatar}</span>
+                          <SmartAvatar value={u.avatar} alt={u.name} size={34} rounded="rounded-full" textClass="text-xl" />
                           <div>
                             <p className="font-medium text-gray-900">{u.name}</p>
                             <p className="text-xs text-gray-500" dir="ltr">@{u.username}</p>
@@ -545,7 +566,7 @@ const Platform = () => {
                         </span>
                       </td>
                       <td className="py-3 px-2 text-gray-600">
-                        {u.role === 'super_admin' ? '👑 ' + t('allPharmacies') : (ph ? `${ph.logo} ${pickName(ph)}` : '—')}
+                        {u.role === 'super_admin' ? '👑 ' + t('allPharmacies') : (ph ? <span className="inline-flex items-center gap-1"><SmartAvatar value={ph.logo} alt="" size={18} rounded="rounded-md" fallback="💊" textClass="text-sm" />{pickName(ph)}</span> : '—')}
                       </td>
                       <td className="py-3 px-2">
                         <button
@@ -590,7 +611,7 @@ const Platform = () => {
               return (
                 <div key={u.id} className="p-4 rounded-xl border border-gray-200 space-y-2">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{u.avatar}</span>
+                    <SmartAvatar value={u.avatar} alt={u.name} size={40} rounded="rounded-full" textClass="text-2xl" />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 truncate">{u.name}</p>
                       <p className="text-xs text-gray-500" dir="ltr">@{u.username}</p>

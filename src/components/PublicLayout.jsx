@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
 import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
-import { Stethoscope, Store, Info, BookOpen, FileText, ShieldCheck, Lock, HeartPulse, Download } from 'lucide-react'
+import { Store, Info, BookOpen, FileText, ShieldCheck, Lock, Download } from 'lucide-react'
 
 // =====================================================================
 // التخطيط الموحد للصفحات العامة (من نحن / دليل الاستخدام / الشروط /
@@ -28,8 +28,8 @@ const PublicLayout = ({ children, active }) => {
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-gray-200 safe-top">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-3">
           <Link to="/shop" className="flex items-center gap-2.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/30">
-              <Stethoscope className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/30 bg-white border border-primary-100">
+              <img src="/logo.png" alt="PHMP" className="w-full h-full object-cover" />
             </div>
             <div className="min-w-0">
               <h1 className="font-bold text-gray-900 truncate">{t('appShortName')}</h1>
@@ -86,8 +86,22 @@ const PublicLayout = ({ children, active }) => {
         </div>
       </header>
 
+      {/* ===== العلامة المائية للمنصة ===== */}
+      <img
+        src="/logo-watermark.png"
+        alt=""
+        aria-hidden="true"
+        className="fixed z-0 pointer-events-none select-none print:hidden"
+        style={{
+          bottom: '4%',
+          [isRTL ? 'left' : 'right']: '4%',
+          width: 'clamp(120px, 18vw, 220px)',
+          opacity: 0.05,
+        }}
+      />
+
       {/* ===== المحتوى ===== */}
-      <main className="max-w-4xl w-full mx-auto p-4 pb-16 safe-bottom flex-1">
+      <main className="max-w-4xl w-full mx-auto p-4 pb-16 safe-bottom flex-1 relative z-[1]">
         {children}
       </main>
 
@@ -97,7 +111,7 @@ const PublicLayout = ({ children, active }) => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <HeartPulse className="w-4 h-4 text-primary-600" />
+                <img src="/logo.png" alt="PHMP" className="w-6 h-6 rounded-md object-cover" />
                 <span className="font-bold text-gray-900">{t('appName')}</span>
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">{t('footerMission')}</p>

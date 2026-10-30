@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { ROLE_INFO } from '../config/permissions'
 import { setApiUrl, getApiUrl, setApiKey, getApiKey } from '../lib/api'
+import LogoUpload from '../components/LogoUpload'
+import SmartAvatar, { isImage } from '../components/SmartAvatar'
 import {
   Settings as SettingsIcon, Globe, Bell, Shield, Database,
   Building2, Users, Palette, Save, Mail, Phone, MapPin, FileText,
@@ -132,9 +134,15 @@ const Settings = () => {
           {activeTab === 'pharmacy' && currentPharmacy && (
             <div className="card p-6 space-y-4">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-2xl">
-                  {currentPharmacy.logo}
-                </div>
+                <SmartAvatar
+                  value={currentPharmacy.logo}
+                  alt={currentPharmacy.name}
+                  size={48}
+                  rounded="rounded-xl"
+                  textClass="text-2xl"
+                  fallback="💊"
+                  className="gradient-primary"
+                />
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">{currentPharmacy.name}</h3>
                   <p className="text-sm text-gray-500">{currentPharmacy.license}</p>
@@ -225,9 +233,14 @@ const Settings = () => {
                   const ph = pharmaciesData.find(p => p.id === u.pharmacyId)
                   return (
                     <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${u.role === 'super_admin' ? 'bg-gradient-to-br from-violet-400 to-violet-600' : 'bg-gradient-to-br from-primary-400 to-primary-600'}`}>
-                        {u.avatar}
-                      </div>
+                      <SmartAvatar
+                        value={u.avatar}
+                        alt={u.name}
+                        size={40}
+                        rounded="rounded-full"
+                        textClass="text-xl"
+                        className={u.role === 'super_admin' ? 'bg-gradient-to-br from-violet-400 to-violet-600' : 'bg-gradient-to-br from-primary-400 to-primary-600'}
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 text-sm truncate">{u.name}</p>
                         <p className="text-xs text-gray-500">
@@ -265,6 +278,15 @@ const Settings = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowUserModal(null)}>
                   <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4" onClick={e => e.stopPropagation()}>
                     <h3 className="font-bold text-gray-900">{showUserModal === 'new' ? t('addUser') : `${t('edit')} - ${showUserModal.name}`}</h3>
+                    {/* صورة المستخدم (موظف) — اختيارية */}
+                    <LogoUpload
+                      value={isImage(userForm.avatar) ? userForm.avatar : null}
+                      onChange={(img) => setUserForm({ ...userForm, avatar: img || '👤' })}
+                      label={t('userPhoto')}
+                      hint={t('userPhotoHint')}
+                      size={80}
+                      rounded="rounded-full"
+                    />
                     <div>
                       <label className="label">{t('name')} *</label>
                       <input className="input" value={userForm.name} onChange={e => setUserForm({ ...userForm, name: e.target.value })} />
@@ -303,6 +325,7 @@ const Settings = () => {
                             if (userForm.name && userForm.username && userForm.password) addUser(userForm)
                           } else {
                             const updates = { name: userForm.name, role: userForm.role, pharmacyId: userForm.pharmacyId }
+                            if (isImage(userForm.avatar)) updates.avatar = userForm.avatar
                             if (userForm.password) updates.password = userForm.password
                             updateUser(showUserModal.id, updates)
                           }

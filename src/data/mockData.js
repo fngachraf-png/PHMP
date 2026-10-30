@@ -1,4 +1,9 @@
 // Mock data for Pharmacy Management Platform PHMP - realistic pharmacy data
+// المبيعات التجريبية تُبنى على الأدوية الرسمية للائحة المغربية حتى تُعرض
+// أسماء الأدوية بلغة الواجهة الصحيحة (AR/FR/EN) في التقارير والرسوم،
+// وترتبط بتكلفة حقيقية (COGS) في تقرير الأرباح.
+import { moroccanDrugs } from './moroccanDrugs'
+
 export const pharmacies = [
   {
     id: 'ph1',
@@ -108,12 +113,12 @@ export const categories = [
 ]
 
 export const customers = [
-  { id: 'c1', name: 'أحمد بن محمد', phone: '+212 661 234 567', email: 'ahmed@email.com', address: 'الدار البيضاء', loyaltyPoints: 245, totalPurchases: 1850, lastVisit: '2026-06-18', avatar: '👨' },
-  { id: 'c2', name: 'خديجة العلوي', phone: '+212 662 345 678', email: 'khadija@email.com', address: 'الرباط', loyaltyPoints: 580, totalPurchases: 4200, lastVisit: '2026-06-20', avatar: '👩' },
-  { id: 'c3', name: 'يوسف التازي', phone: '+212 663 456 789', email: 'youssef@email.com', address: 'مراكش', loyaltyPoints: 120, totalPurchases: 950, lastVisit: '2026-06-15', avatar: '🧑' },
-  { id: 'c4', name: 'سارة بنعمر', phone: '+212 664 567 890', email: 'sara@email.com', address: 'فاس', loyaltyPoints: 320, totalPurchases: 2800, lastVisit: '2026-06-19', avatar: '👩' },
-  { id: 'c5', name: 'كريم الإدريسي', phone: '+212 665 678 901', email: 'karim@email.com', address: 'طنجة', loyaltyPoints: 95, totalPurchases: 680, lastVisit: '2026-06-12', avatar: '👨' },
-  { id: 'c6', name: 'مريم الحسني', phone: '+212 666 789 012', email: 'mariam@email.com', address: 'أكادير', loyaltyPoints: 410, totalPurchases: 3450, lastVisit: '2026-06-21', avatar: '👩' },
+  { id: 'c1', name: 'أحمد بن محمد', nameEn: 'Ahmed Ben Mohamed', phone: '+212 661 234 567', email: 'ahmed@email.com', address: 'الدار البيضاء', loyaltyPoints: 245, totalPurchases: 1850, lastVisit: '2026-06-18', avatar: '👨' },
+  { id: 'c2', name: 'خديجة العلوي', nameEn: 'Khadija Alaoui', phone: '+212 662 345 678', email: 'khadija@email.com', address: 'الرباط', loyaltyPoints: 580, totalPurchases: 4200, lastVisit: '2026-06-20', avatar: '👩' },
+  { id: 'c3', name: 'يوسف التازي', nameEn: 'Youssef Tazi', phone: '+212 663 456 789', email: 'youssef@email.com', address: 'مراكش', loyaltyPoints: 120, totalPurchases: 950, lastVisit: '2026-06-15', avatar: '🧑' },
+  { id: 'c4', name: 'سارة بنعمر', nameEn: 'Sara Benamar', phone: '+212 664 567 890', email: 'sara@email.com', address: 'فاس', loyaltyPoints: 320, totalPurchases: 2800, lastVisit: '2026-06-19', avatar: '👩' },
+  { id: 'c5', name: 'كريم الإدريسي', nameEn: 'Karim Idrissi', phone: '+212 665 678 901', email: 'karim@email.com', address: 'طنجة', loyaltyPoints: 95, totalPurchases: 680, lastVisit: '2026-06-12', avatar: '👨' },
+  { id: 'c6', name: 'مريم الحسني', nameEn: 'Meryem Hassani', phone: '+212 666 789 012', email: 'mariam@email.com', address: 'أكادير', loyaltyPoints: 410, totalPurchases: 3450, lastVisit: '2026-06-21', avatar: '👩' },
 ]
 
 export const suppliers = [
@@ -200,6 +205,10 @@ export const prescriptions = [
 
 // Generate sales history
 const generateSales = () => {
+  // بناء المبيعات التجريبية من الأدوية الرسمية (نفس قاعدة المنصة) — يضمن:
+  //  1) أسماء أدوية مترجمة بالثلاث لغات في كل الرسوم والجداول والتصدير
+  //  2) ارتباط المنتجات بالتكلفة الفعلية فيتسم تقرير الأرباح دقيقاً
+  const officialDrugs = moroccanDrugs.filter(d => d.price > 0).slice(0, 120)
   const sales = []
   const today = new Date()
   const paymentMethods = ['cash', 'card', 'transfer', 'insurance']
@@ -211,19 +220,21 @@ const generateSales = () => {
     const items = []
 
     for (let j = 0; j < itemsCount; j++) {
-      const product = products[Math.floor(Math.random() * products.length)]
+      const product = officialDrugs[Math.floor(Math.random() * officialDrugs.length)]
       const qty = Math.floor(Math.random() * 3) + 1
       items.push({
         productId: product.id,
-        name: product.name,
-        nameEn: product.nameEn, // لعرض الاسم حسب لغة الواجهة في التقارير والرسوم
+        name: product.nameAr || product.name,
+        nameAr: product.nameAr || product.name,
+        nameEn: product.nameEn || product.name, // لعرض الاسم حسب لغة الواجهة في التقارير والرسوم
+        nameFr: product.nameFr || product.nameEn || product.name,
         price: product.price,
         quantity: qty,
-        total: product.price * qty
+        total: Number((product.price * qty).toFixed(2))
       })
     }
 
-    const subtotal = items.reduce((sum, item) => sum + item.total, 0)
+    const subtotal = Number(items.reduce((sum, item) => sum + item.total, 0).toFixed(2))
     const customer = customers[Math.floor(Math.random() * customers.length)]
 
     sales.push({
@@ -234,9 +245,9 @@ const generateSales = () => {
       customer: customer,
       items: items,
       subtotal: subtotal,
-      tax: subtotal * 0.05,
-      discount: i % 5 === 0 ? subtotal * 0.1 : 0,
-      total: subtotal + subtotal * 0.05 - (i % 5 === 0 ? subtotal * 0.1 : 0),
+      tax: Number((subtotal * 0.05).toFixed(2)),
+      discount: i % 5 === 0 ? Number((subtotal * 0.1).toFixed(2)) : 0,
+      total: Number((subtotal + subtotal * 0.05 - (i % 5 === 0 ? subtotal * 0.1 : 0)).toFixed(2)),
       paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
       cashier: ['يوسف بن علي', 'فاطمة الزهراء', 'محمد الإدريسي'][Math.floor(Math.random() * 3)]
     })

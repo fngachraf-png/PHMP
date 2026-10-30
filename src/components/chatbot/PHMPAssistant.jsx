@@ -316,7 +316,10 @@ const PHMPAssistant = () => {
         aria-label={t('assistantOpen')}
         className={`fixed bottom-5 end-5 z-[70] w-14 h-14 rounded-full gradient-primary text-white shadow-xl shadow-primary-600/40 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 ${open ? 'scale-90 opacity-90' : ''}`}
       >
-        {open ? <X className="w-6 h-6" /> : <Bot className="w-7 h-7" />}
+        {open ? <X className="w-6 h-6" /> : (
+          /* لوغو المساعد الرسمي كأيقونة إطلاق */
+          <img src="/assistant-logo.png" alt="" className="w-12 h-12 rounded-full object-cover ring-2 ring-white/70" draggable={false} />
+        )}
         {launcherBadge && !open && (
           <span className="absolute -top-1 -end-1 w-5 h-5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center animate-pulse">
             {unread > 0 ? unread : '!'}
@@ -334,8 +337,8 @@ const PHMPAssistant = () => {
         >
           {/* الترويسة */}
           <div className="gradient-primary px-4 py-3 text-white flex items-center gap-3 flex-shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-              <Bot className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden bg-white flex items-center justify-center flex-shrink-0 shadow-md">
+              <img src="/assistant-logo.png" alt="" className="w-full h-full object-cover" draggable={false} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-sm leading-tight">{t('assistantName')}</p>
@@ -372,7 +375,10 @@ const PHMPAssistant = () => {
                 </div>
 
                 {messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.mine ? 'justify-end' : 'justify-start'}`}>
+                  <div key={m.id} className={`flex items-end gap-1.5 ${m.mine ? 'justify-end' : 'justify-start'}`}>
+                    {!m.mine && (
+                      <img src="/assistant-logo.png" alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-0.5 border border-gray-200 bg-white" draggable={false} />
+                    )}
                     <div className={`max-w-[88%] ${m.mine
                       ? 'px-3.5 py-2.5 rounded-2xl rounded-br-sm bg-primary-600 text-white text-sm leading-relaxed'
                       : 'px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-white border border-gray-200 text-gray-900 text-sm leading-relaxed shadow-sm w-full'}`}
@@ -403,7 +409,8 @@ const PHMPAssistant = () => {
                 ))}
 
                 {typing && (
-                  <div className="flex justify-start">
+                  <div className="flex justify-start items-end gap-1.5">
+                    <img src="/assistant-logo.png" alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-0.5 border border-gray-200 bg-white" draggable={false} />
                     <div className="px-4 py-3 rounded-2xl rounded-bl-sm bg-white border border-gray-200 shadow-sm flex items-center gap-1.5">
                       {[0, 1, 2].map((i) => (
                         <span key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />

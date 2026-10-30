@@ -5,6 +5,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher'
 import CheckoutModal from '../components/CheckoutModal'
 import CustomerAccountModal from '../components/CustomerAccountModal'
 import OrderTracking from '../components/OrderTracking'
+import SmartAvatar from '../components/SmartAvatar'
 import {
   Stethoscope, Store, MapPin, Phone, Search, ShoppingCart, Trash2, Plus, Minus,
   ArrowRight, ArrowLeft, PackageSearch, ClipboardList, LogOut, X, BadgeCheck,
@@ -161,9 +162,7 @@ const Shop = () => {
             className="card p-5 text-start hover:shadow-lg hover:-translate-y-1 transition-all group"
           >
             <div className="flex items-start gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center text-3xl flex-shrink-0">
-                {ph.logo}
-              </div>
+              <SmartAvatar value={ph.logo} alt={pickName(ph)} size={56} rounded="rounded-2xl" fallback="💊" textClass="text-3xl" className="bg-gradient-to-br from-primary-50 to-primary-100" />
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-gray-900 truncate group-hover:text-primary-700">{pickName(ph)}</h3>
                 <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
@@ -197,7 +196,7 @@ const Shop = () => {
           <ArrowLeft className="w-3.5 h-3.5 rtl-flip" /> {t('backToPharmacies')}
         </button>
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-2xl">{pharmacy?.logo}</span>
+          <SmartAvatar value={pharmacy?.logo} alt="" size={32} rounded="rounded-lg" fallback="💊" textClass="text-2xl" />
           <div className="min-w-0">
             <p className="font-bold text-gray-900 truncate">{pharmacy && pickName(pharmacy)}</p>
             <p className="text-xs text-gray-500 truncate">{pickAddress(pharmacy)}</p>
@@ -284,12 +283,25 @@ const Shop = () => {
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-primary-50/60 via-white to-white">
+      {/* العلامة المائية للوغو المنصة */}
+      <img
+        src="/logo-watermark.png"
+        alt=""
+        aria-hidden="true"
+        className="fixed z-0 pointer-events-none select-none print:hidden"
+        style={{
+          bottom: '4%',
+          [isRTL ? 'left' : 'right']: '4%',
+          width: 'clamp(120px, 18vw, 220px)',
+          opacity: 0.05,
+        }}
+      />
       {/* ===== الترويسة ===== */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-gray-200 safe-top">
         <div className="max-w-6xl mx-auto flex items-center gap-3 px-4 h-16">
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/30">
-              <Stethoscope className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden bg-white border border-primary-100 flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/30">
+              <img src="/logo.png" alt="PHMP" className="w-full h-full object-cover" />
             </div>
             <div className="min-w-0">
               <h1 className="font-bold text-gray-900 truncate">{t('shopTitle')}</h1>

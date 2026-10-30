@@ -2,11 +2,13 @@ import { useApp } from '../contexts/AppContext'
 import { Printer, Receipt, Truck, Stethoscope, Download } from 'lucide-react'
 import { printInvoice } from '../lib/print'
 import { exportToCSV } from '../lib/exportUtils'
+import { pickItemName } from '../i18n/translations'
 
 // =====================================================================
 // فاتورة البيع / وصل التوصيل — قابل للطباعة
 // يطبع إلزامياً: اسم الصيدلية + اسم الدواء + سعره + طريقة الدفع
 // يدعم: مبيعات نقطة البيع (POS) والطلبات المباشرة من الزبناء
+// العلامة المائية: لوغو الصيدلية إن توفر، وإلا لوغو المنصة PHMP
 // =====================================================================
 
 const paymentLabels = {
@@ -16,6 +18,8 @@ const paymentLabels = {
   insurance: { ar: 'تأمين', fr: 'Assurance', en: 'Insurance' },
   on_delivery: { ar: 'الدفع عند الاستلام/التوصيل', fr: 'Paiement à la livraison', en: 'Pay on pickup/delivery' },
 }
+
+const isLogoImage = (l) => typeof l === 'string' && l.startsWith('data:image')
 
 const InvoicePrint = ({ sale, mode = 'invoice' }) => {
   const { t, language, isRTL, currentPharmacy, pickName, pickAddress } = useApp()
@@ -40,7 +44,7 @@ const InvoicePrint = ({ sale, mode = 'invoice' }) => {
     const rows = [
       [t('description'), t('quantity'), t('unitPrice'), t('lineTotal')],
       ...items.map((item) => [
-        pickName(item) || item.name || '',
+        pickItemName(item, language) || item.name || '',
         item.quantity,
         Number(item.price).toFixed(2),
         (item.price * item.quantity).toFixed(2),
@@ -60,13 +64,30 @@ const InvoicePrint = ({ sale, mode = 'invoice' }) => {
       {/* ===== منطقة الطباعة ===== */}
       <div
         className="print-area bg-white text-gray-900 rounded-xl border border-gray-200 mx-auto"
-        style={{ maxWidth: '80mm', width: '100%', padding: '14px 12px', fontSize: '12px', fontFamily: isRTL ? "'Cairo', sans-serif" : "'Inter', sans-serif" }}
+        style={{ maxWidth: '80mm', width: '100%', padding: '14px 12px', fontSize: '12px', fontFamily: isRTL ? "'Cairo', sans-serif" : "'Inter', sans-serif", position: 'relative' }}
         dir={isRTL ? 'rtl' : 'ltr'}
       >
+        {/* علامة مائية: لوغو الصيدلية إن توفر وإلا لوغو المنصة */}
+        <img
+          src={isLogoImage(pharmacy.logo) ? pharmacy.logo : '/logo.png'}
+          alt=""
+          aria-hidden="true"
+          style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            width: 150, maxWidth: '70%', opacity: 0.07, pointerEvents: 'none', userSelect: 'none',
+          }}
+        />
         {/* رأس الفاتورة: اسم الصيدلية إلزامي */}
-        <div style={{ textAlign: 'center', borderBottom: '2px dashed #d1d5db', paddingBottom: '10px' }}>
+        <div style={{ textAlign: 'center', borderBottom: '2px dashed #d1d5db', paddingBottom: '10px', position: 'relative' }}>
+          {isLogoImage(pharmacy.logo) ? (
+            <img src={pharmacy.logo} alt="" style={{ width: 44, height: 44, objectFit: 'contain', margin: '0 auto 4px', display: 'block' }} />
+          ) : (
+            <div style={{ width: 44, height: 44, margin: '0 auto 4px' }}>
+              <img src="/logo.png" alt="" style={{ width: 44, height: 44, objectFit: 'contain', display: 'block' }} />
+            </div>
+          )}
           <div style={{ fontSize: '22px', fontWeight: 800, lineHeight: 1.3 }}>
-            {pharmacy.logo ? `${pharmacy.logo} ` : ''}{pickName(pharmacy) || pharmacy.name || t('appName')}
+            {(!isLogoImage(pharmacy.logo) && pharmacy.logo) ? `${pharmacy.logo} ` : ''}{pickName(pharmacy) || pharmacy.name || t('appName')}
           </div>
           {pharmacy.address && <div style={{ fontSize: '10px', color: '#4b5563', marginTop: 2 }}>{pickAddress(pharmacy)}</div>}
           <div style={{ fontSize: '10px', color: '#4b5563' }}>
@@ -89,7 +110,7 @@ const InvoicePrint = ({ sale, mode = 'invoice' }) => {
           {sale.customer && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
               <span>{t('customer')}:</span>
-              <span style={{ fontWeight: 600 }}>{sale.customer.name || sale.customer.fullName}</span>
+              <span style={{ fontWeight: 600 }}>{pickName(sale.customer) || sale.customer.name || sale.customer.fullName}</span>
             </div>
           )}
           {sale.customer?.phone && (
@@ -120,7 +141,7 @@ const InvoicePrint = ({ sale, mode = 'invoice' }) => {
             {items.map((item, i) => (
               <tr key={i} style={{ borderBottom: '1px dotted #d1d5db' }}>
                 <td style={{ padding: '4px 2px' }}>
-                  {pickName(item) || item.name}
+                  {pickItemName(item, language) || item.name}
                   {item.requiresPrescription && <span title={t('requiresPrescription')}> ⚕</span>}
                 </td>
                 <td style={{ textAlign: 'center', padding: '4px 2px' }}>{item.quantity}</td>

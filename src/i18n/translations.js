@@ -29,6 +29,16 @@ export const pickName = (item, language) => {
   return item.nameEn || item.name || item.nameAr || item.nameFr || ''
 }
 
+// حل اسم بند بيع (سطر فاتورة) حسب لغة الواجهة — يعمل على حقول السطر نفسه
+// عند تعذر الوصول للمنتج الأصلي. يُستعمل في الرسوم والجداول والتصدير
+// لضمان لغة موحدة داخل التقرير أياً كانت لغة حفظ البيانات.
+export const pickItemName = (item, language) => {
+  if (!item) return ''
+  if (language === 'fr') return item.nameFr || item.nameEn || item.name || item.nameAr || ''
+  if (language === 'en') return item.nameEn || item.nameFr || item.name || item.nameAr || ''
+  return item.name || item.nameAr || item.nameEn || item.nameFr || ''
+}
+
 // اختيار العنوان المناسب حسب اللغة (يدعم address / addressFr / addressEn)
 export const pickAddress = (item, language) => {
   if (!item) return ''

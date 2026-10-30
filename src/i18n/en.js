@@ -501,4 +501,15 @@ export const en = {
   assistantAskDrugName: "Type the medicine name (brand or INN/DCI — even misspelled): I will correct it and show its official card from the Moroccan list.",
   assistantGenericGuidance: "I can help you with: finding medicines and correcting their names, prescription rules, delivery, ordering and tracking, official prices and reimbursement, and the governing laws. Type a medicine name or pick a topic.",
   assistantNewMsg: 'New message from PHMP Assistant',
+  // ===== Photos & logos (v1.8.0) =====
+  userPhoto: 'User photo',
+  userPhotoHint: 'Optional photo shown next to the name across the interface',
+  pharmacyLogo: 'Pharmacy logo (image)',
+  pharmacyLogoHint: 'Used on invoices, reports and the interface; falls back to the platform logo',
+  customerPhoto: 'Customer photo (optional)',
+  customerPhotoHint: 'Shown on your account and orders',
+  // ===== Official picker (CNSS & Ministry list) =====
+  officialCatalogPicker: 'Quick add from the official list',
+  officialCatalogSearchHint: 'Search by brand name, DCI or barcode — e.g. doliprane, AUGMENTIN, 61117…',
+  officialCatalogNote: 'Official Moroccan list unified with the CNSS reimbursable medicines list — click a result to auto-fill the form with official names and prices.',
 }

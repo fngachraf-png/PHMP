@@ -1,15 +1,22 @@
 // Pharmacy Management Platform PHMP - Service Worker
 // Strategy: Network-first for HTML, Cache-first for assets
-const CACHE_NAME = 'phmp-v3'
-const STATIC_CACHE = 'phmp-static-v3'
+const CACHE_NAME = 'phmp-v4'
+const STATIC_CACHE = 'phmp-static-v4'
 
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon.svg',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg'
+  '/logo.png',
+  '/logo-watermark.png',
+  '/favicon-32.png',
+  '/favicon-16.png',
+  '/favicon.ico',
+  '/apple-touch-icon.png',
+  '/assistant-logo.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ]
 
 // Install: cache static assets

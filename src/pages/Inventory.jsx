@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { exportToCSV, money } from '../lib/exportUtils'
+import { searchOfficialCatalog, reimbursementRate, OFFICIAL_CATALOG_SIZE, CNSS_LIST_COUNT } from '../lib/officialCatalog'
 import {
   Plus, Search, Edit, Trash2, Filter, Package, AlertTriangle,
   Calendar, TrendingDown, Barcode, Pill, X, Save, Download,
-  Layers, Box, ChevronDown, Shield, Database
+  Layers, Box, ChevronDown, Shield, Database, BadgeCheck, Sparkles
 } from 'lucide-react'
 
 const Inventory = () => {
@@ -15,12 +16,47 @@ const Inventory = () => {
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [viewMode, setViewMode] = useState('table')
+  // المنتقي الرسمي: بحث في اللائحة الرسمية الموحدة لتعبئة النموذج بنقرة
+  const [catalogQuery, setCatalogQuery] = useState('')
+  const [catalogResults, setCatalogResults] = useState([])
 
   const [formData, setFormData] = useState({
     name: '', nameEn: '', barcode: '', sku: '', manufacturer: '',
     category: 'painkillers', cost: 0, price: 0, stock: 0, minStock: 10,
     expiry: '', batch: '', requiresPrescription: false, dosage: '', image: '💊'
   })
+
+  const onCatalogSearch = (q) => {
+    setCatalogQuery(q)
+    setCatalogResults(q.trim().length >= 2 ? searchOfficialCatalog(q, 8) : [])
+  }
+
+  // تعبئة النموذج من اللائحة الرسمية (اسم بالثلاث لغات + باركود + أسعار + تعويض)
+  const pickFromCatalog = (d) => {
+    setFormData((f) => ({
+      ...f,
+      name: d.nameAr || d.name || f.name,
+      nameEn: d.nameEn || d.name || f.nameEn,
+      nameFr: d.nameFr || d.nameEn || d.name,
+      barcode: d.code || d.barcode || f.barcode,
+      sku: d.sku || `MA-${d.code}`,
+      manufacturer: d.manufacturer || f.manufacturer,
+      category: d.category || 'other',
+      cost: d.cost || f.cost,
+      price: d.price || d.ppv || f.price,
+      dosage: d.dosage || f.dosage,
+      form: d.form || f.form,
+      presentation: d.presentation || f.presentation,
+      dci: d.dci || f.dci,
+      requiresPrescription: d.requiresPrescription ?? false,
+      tauxRemboursement: d.tauxRemboursement ?? '',
+      cnss: !!d.cnss,
+      ppv: d.ppv || d.price || 0,
+      ph: d.ph || d.cost || 0,
+    }))
+    setCatalogResults([])
+    setCatalogQuery(d.nameEn || d.name || '')
+  }
 
   const filteredProducts = useMemo(() => {
     return productsData.filter(p => {
@@ -251,12 +287,19 @@ const Inventory = () => {
                           {pickName(product)}
                         </p>
                         <p className="text-xs text-gray-500">{product.dci || product.manufacturer}</p>
-                        {product.requiresPrescription && (
-                          <span className="badge-info text-xs mt-1">Rx</span>
-                        )}
-                        {product.princepsGenerique === 'G' && (
-                          <span className="badge-success text-xs mt-1">{t('generic')}</span>
-                        )}
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {product.requiresPrescription && (
+                            <span className="badge-info text-xs">Rx</span>
+                          )}
+                          {product.princepsGenerique === 'G' && (
+                            <span className="badge-success text-xs">{t('generic')}</span>
+                          )}
+                          {(product.cnss || reimbursementRate(product) > 0) && (
+                            <span className="badge-success text-[10px] flex items-center gap-0.5">
+                              <BadgeCheck className="w-3 h-3" /> CNSS{reimbursementRate(product) > 0 ? ` ${reimbursementRate(product)}%` : ''}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td>
@@ -408,6 +451,64 @@ const Inventory = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* ===== المنتقي الرسمي: إضافة سريعة من اللائحة الرسمية ===== */}
+              {!editingProduct && (
+                <div className="p-4 rounded-xl border-2 border-primary-200 bg-primary-50/60 space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-sm font-bold text-primary-800 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4" /> {t('officialCatalogPicker')}
+                    </p>
+                    <span className="text-[11px] text-primary-700 bg-primary-100 rounded-full px-2 py-0.5 font-semibold tabular-nums">
+                      {OFFICIAL_CATALOG_SIZE.toLocaleString()}{CNSS_LIST_COUNT > 0 ? ` + CNSS ${CNSS_LIST_COUNT.toLocaleString()}` : ''}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      className="input ps-9"
+                      value={catalogQuery}
+                      onChange={(e) => onCatalogSearch(e.target.value)}
+                      placeholder={t('officialCatalogSearchHint')}
+                      dir="auto"
+                    />
+                  </div>
+                  {catalogResults.length > 0 && (
+                    <div className="space-y-1 max-h-56 overflow-y-auto rounded-xl bg-white border border-primary-100 p-1.5 shadow-sm">
+                      {catalogResults.map((d) => {
+                        const rate = reimbursementRate(d)
+                        return (
+                          <button
+                            type="button"
+                            key={`${d.code}-${d.id}`}
+                            onClick={() => pickFromCatalog(d)}
+                            className="w-full text-start p-2 rounded-lg hover:bg-primary-50 transition-colors flex items-center gap-2"
+                          >
+                            <Pill className="w-4 h-4 text-primary-600 flex-shrink-0" />
+                            <span className="flex-1 min-w-0">
+                              <span className="block text-sm font-semibold text-gray-900 truncate">
+                                {d.nameEn || d.name}
+                                {d.dci && <span className="text-[11px] font-normal text-gray-500"> — {d.dci}</span>}
+                              </span>
+                              <span className="block text-[11px] text-gray-500 truncate">
+                                {d.dosage ? `${d.dosage} • ` : ''}{d.presentation || d.form || ''}
+                                {d.ppv ? ` • PPV ${Number(d.ppv).toFixed(2)} MAD` : ''}
+                              </span>
+                            </span>
+                            {(d.cnss || rate > 0) && (
+                              <span className="badge-success text-[10px] flex items-center gap-0.5 flex-shrink-0">
+                                <BadgeCheck className="w-3 h-3" /> CNSS{rate > 0 ? ` ${rate}%` : ''}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-gray-500">{t('officialCatalogNote')}</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="label">{t('productName')} (AR)</label>

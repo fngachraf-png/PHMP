@@ -6,10 +6,11 @@ import {
 } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { getChartTheme } from '../lib/chartTheme'
+import { pickItemName } from '../i18n/translations'
 import { Link } from 'react-router-dom'
 
 const Dashboard = () => {
-  const { t, isRTL, productsData, salesData, customersData, prescriptionsData, currentPharmacy , pickName, language, theme} = useApp()
+  const { t, isRTL, productsData, salesData, customersData, prescriptionsData, currentPharmacy , pickName, language, theme, categories} = useApp()
   const chart = getChartTheme(theme)
 
   // Calculate KPIs
@@ -76,7 +77,8 @@ const Dashboard = () => {
     sale.items.forEach(item => {
       if (!productSales[item.productId]) {
         const product = item.productId ? productsData.find(p => p.id === item.productId) : null
-        productSales[item.productId] = { name: product ? pickName(product) : item.name, quantity: 0, revenue: 0 }
+        // حل الاسم بلغة الواجهة من المنتج الأصلي، وإلا من مرادفات سطر البيع
+        productSales[item.productId] = { name: product ? pickName(product) : pickItemName(item, language), quantity: 0, revenue: 0 }
       }
       productSales[item.productId].quantity += item.quantity
       productSales[item.productId].revenue += item.total
@@ -100,10 +102,11 @@ const Dashboard = () => {
     categoryData[p.category] += p.stock * p.cost
   })
 
-  const pieData = Object.entries(categoryData).slice(0, 6).map(([name, value]) => ({
-    name: name,
-    value: Math.round(value)
-  }))
+  // أسماء الفئات مترجمة حسب لغة الواجهة (لا معرفات خام داخل المخطط)
+  const pieData = Object.entries(categoryData).slice(0, 6).map(([catId, value]) => {
+    const cat = (categories || []).find(c => c.id === catId)
+    return { name: cat ? pickName(cat) : catId, value: Math.round(value) }
+  })
 
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 

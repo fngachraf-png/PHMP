@@ -500,4 +500,15 @@ export const fr = {
   assistantAskDrugName: "Tapez le nom du médicament (commercial ou DCI — même mal orthographié) : je le corrige et affiche sa fiche officielle de la liste marocaine.",
   assistantGenericGuidance: "Je peux vous aider à : rechercher des médicaments et corriger leurs noms, les règles d’ordonnance, la livraison, la commande et le suivi, les prix officiels et le remboursement, et les lois en vigueur. Tapez un nom de médicament ou choisissez un sujet.",
   assistantNewMsg: 'Nouveau message de l’Assistant PHMP',
+  // ===== Photos et logos (v1.8.0) =====
+  userPhoto: 'Photo de l’utilisateur',
+  userPhotoHint: 'Photo facultative affichée à côté du nom dans toute l’interface',
+  pharmacyLogo: 'Logo de la pharmacie (image)',
+  pharmacyLogoHint: 'Utilisé sur les factures, rapports et l’interface ; à défaut, le logo de la plateforme est utilisé',
+  customerPhoto: 'Photo du client (facultative)',
+  customerPhotoHint: 'Affichée sur votre compte et vos commandes',
+  // ===== Sélecteur officiel (liste CNSS et Ministère) =====
+  officialCatalogPicker: 'Ajout rapide depuis la liste officielle',
+  officialCatalogSearchHint: 'Rechercher par nom commercial, DCI ou code-barres — ex. : doliprane, AUGMENTIN, 61117…',
+  officialCatalogNote: 'Liste officielle marocaine unifiée avec la liste CNSS des médicaments remboursables — cliquez sur un résultat pour remplir le formulaire automatiquement.',
 }
