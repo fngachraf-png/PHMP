@@ -220,20 +220,24 @@ const PHMPAssistant = () => {
         await new Promise((r) => setTimeout(r, 350)) // إيقاع طبيعي
         pushMessage({ mine: false, ...buildLocalAnswer(analysis) })
       } else {
-        // صياغة النموذج اللغوي (كلاودفلير) بسياق موثق + سقوط محلي آمن
-        const drugCards = (analysis.drugMatches || []).map((m) => toDrugCard(m.drug, language)).filter(Boolean)
+        // صياغة النموذج اللغوي (كلاودفلير) بسياق موثق + سقوط محلي آمن.
+        // البطاقات دائماً من المحرك المحلي (قاعدة المنصة) — النموذج يصوغ
+        // النص فقط، فلا تفقد بطاقات الأدوية مهما كان مصدر الجواب.
+        const fallback = buildLocalAnswer(analysis)
         const reply = await getAssistantReply({
           question: text,
           history: messages.slice(-6),
           language,
           role: audience,
-          drugCards,
+          drugCards: fallback.drugs || [],
           kbEntries: analysis.kbEntry ? [analysis.kbEntry] : [],
           platformInfo: t('appName'),
-          localFallback: () => buildLocalAnswer(analysis),
+          localFallback: () => fallback,
         })
-        const local = reply || buildLocalAnswer(analysis)
-        pushMessage({ mine: false, ...local })
+        const answer = reply?.via === 'llm'
+          ? { ...fallback, text: reply.text }
+          : (reply || fallback)
+        pushMessage({ mine: false, ...answer })
       }
     } catch {
       pushMessage({ mine: false, text: t('assistantErr') })
