@@ -424,6 +424,39 @@ Deployment:
 Stage Summary:
 - المهام الثلاث منجزة ومثبتة رقمياً. المساعد يعمل فوراً بالمحرك المحلي حتى قبل نشر عامل كلاودفلير (وسيعزز بالنموذج اللغوي تلقائياً متى نُشر العامل).
 
+---
+Task ID: 12
+Agent: Local Server Agent
+Date: 2026-10-30
+Task: مزامنة البيئة المحلية مع v1.8.0 + التحقق الإنتاجي (Pages/Vercel/APK) + إصلاح تعليق الحارس
+
+Work Log:
+- سحب `72c4560` (v1.8.0-b11) بـfast-forward؛ شجرة العمل نظيفة. لا تغيير في التبعيات ⇒ لا `npm install`.
+- **نسخة احتياطية قبل المزامنة**: `server/scripts/backup.sh` ⇒ `phmp-2026-10-30T09-19-21-616Z.db` (110,592 بايت · 9 جداول · `quick_check=ok`)؛ قاعدة الإنتاج 8 مستخدمين · 3 صيدليات.
+- بناء الواجهة محلياً: `index-CRdDYTKM.js` (466.26 kB) + `index-Crdwxqgc.css` + `drugs-database-BmmvrVOf.js` (3.34 MB) — نفس بصمة الإنتاج.
+- إعادة تشغيل الخادم والنفق عبر `phmp-guard.sh restart` لتطبيق تعديل الخادم (حقل `avatar` في `PATCH /api/users/:id`).
+
+Testing (كل الأدلة من العناوين العامة):
+- **البصمة موحّدة**: `phmp.pages.dev` و`phmplatform.vercel.app` و`pharmacare-pro-jade.vercel.app` و`dist` المحلي = `index-CRdDYTKM.js` + `index-Crdwxqgc.css`؛ و`/login` تعيد 200 على الثلاثة.
+- **الأصول الجديدة متطابقة بايتاً ببايت** على Pages/Vercel: `logo.png` (`95634914…`)، `logo-watermark.png` (`13320086…`)، `icons/icon-512.png` (`cadd89ea…`)، `sw.js` (`be2a845f…`، كاش `phmp-v4`)، و`manifest.json` باسم «Pharmacy Management Platform PHMP».
+- **APK v1.8.0 مكتمل ومنشور** (وليس قيد البناء): إصدار `v1.8.0-b11` · `PHMP.apk` 4,772,905 بايت · SHA256 `5e26e57a…269f5e` — مطابق للملف المنشور على `https://phmp-download.pages.dev/PHMP.apk` وللملف `.sha256` في الإصدار. داخل APK: `assets/public/assets/index-CRdDYTKM.js` و`drugs-database-BmmvrVOf.js` (إثبات أنه بناء v1.8.0) و**أيقونات launcher مطابقة بكسل-بكسل** للوغو الجديد في كل الكثافات (MAE=0.00 عند 48/72/96/144/192).
+- **GitHub Actions على `72c4560`**: `deploy-cloudflare` success (run 41012832441) · `android-release` success (run 41012832425) · `assistant-deploy` success (run 41012832499).
+- **API العام**: `https://phmp-api.balbolghol-ai.workers.dev/api/health` ⇒ `database:ok` و`uptime` يعكس الخادم المحلي الجديد.
+- **متزايد حي (Playwright على الإنتاج)**: `/login` و`/download` و`/shop` تعمل، لوغو المنصة 512×512 ولوغو المساعد 256×256 محمّلان فعلاً، العلامة المائية في المتجر، رابط APK في `/download` = `https://phmp-download.pages.dev/PHMP.apk`، **0 أخطاء كونسول**. لقطة: `/tmp/phmp-login-v180.png`.
+- **حقل صورة المستخدم (خادم v1.8.0)**: اختبار على نسخة قاعدة معزولة (منفذ 3101، لا يمس الإنتاج): دخول superadmin 200 ⇒ `PATCH /api/users/u1` بـ`avatar` dataURL ⇒ 200 و`updates` تحتوي avatar ⇒ القراءة التالية وSQLite تؤكدان التخزين (118 بايت). أُوقف الخادم التجريبي وحُذف.
+
+Incident/Fix (2026-10-30 03:20 → 09:20):
+- **الخادم والنفق كانا متوقفين**، وحارسا `phmp-guard.sh check` و`services-supervisor.sh ensure` عالقان في حلقة CPU ~96% منذ 03:20 (سجل الحارس يحمل ذيل `tr (uutils) panicked … ENOSYS`). السبب: مسح `/proc/*/cmdline` عبر `cat | tr` حيث ينهار `tr` تحت proot ويترك bash يدور بلا تقدم، ويحتجز `guard.lock` فيمنع كل فحوص cron.
+- **الإصلاح**: استبدال مسح `/proc` بـ`pgrep -f -- "cloudflared.*<token-prefix>"` في `tunnel_proc`/`stop_tunnel`، واستبدال `has_proc` في المشرّف بـ`pgrep`، واستبدال `tr -d '[:space:]'` بتقليم bash. `bash -n` سليم، وقت `phmp-guard.sh check` الآن 0.76 ث، لا عمليات دوّارة، والخادم (PID 597) والنفق (PID 705) يعملان و`/status` = UP.
+
+Deployment:
+- لا تغييرات كود من جهة الخادم في هذا الإصدار؛ هذا الالتزام توثيقي فقط.
+- ملاحظة: الدفع إلى `main` لا يشغّل بناءً لأن مسارات سيري Pages/Android لا تشمل `WORKLOG.md`.
+
+Stage Summary:
+- البيئة المحلية متزامنة مع v1.8.0، والإنتاج (Pages + Vercel) يقدّم نفس البصمة، والـAPK المنشور هو v1.8.0 بأيقونة اللوغو الجديد ومطابق للمصدر بالهاش.
+- المتبقي: تثبيت APK على جهاز المالك وتجربة الصور/المنتقي الرسمي؛ وسحب لائحة CNSS (اختياري) من شبكة مغربية عبر `node scripts/import-cnss-list.mjs`.
+
 ### أولويات العمل القادمة (مرشحة — لاتخذها إلا بتكليف من المالك)
 - [x] ربط تسجيل الدخول بالخادم المحلي (JWT) بدل mockData ✅ منجز في v1.5.0 (Task 6)
 - [x] تصدير تقارير PDF/Excel في صفحة التقارير ✅ منجز في v1.6.0 (Task 7 — CSV + طباعة PDF/A4)
