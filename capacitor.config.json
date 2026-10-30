@@ -1,6 +1,6 @@
 {
   "appId": "com.phmp.pharmacare",
-  "appName": "PharmaCare Pro",
+  "appName": "PHMP",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

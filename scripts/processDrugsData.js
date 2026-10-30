@@ -3,7 +3,7 @@
  * Moroccan Official Drug List Processor
  *
  * Converts the official Moroccan drug list (CSV from Ministry of Health)
- * into a format compatible with the PharmaCare Pro pharmacy system.
+ * into a format compatible with the Pharmacy Management Platform PHMP pharmacy system.
  */
 
 import fs from 'fs'

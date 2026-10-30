@@ -6,12 +6,12 @@ import {
 } from 'lucide-react'
 
 // =====================================================================
-// التحميل والتثبيت — كيف تحصل على منصة PharmaCare Pro (PHMP)
+// التحميل والتثبيت — كيف تحصل على منصة منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP
 // 1) نسخة الويب مباشرة على أي جهاز (بدون تثبيت)
 // 2) تطبيق أندرويد APK بخطوات تثبيت مفصلة
 // =====================================================================
 
-const APK_URL = 'https://phmp-download.pages.dev/PharmaCare-Pro.apk'
+const APK_URL = 'https://phmp-download.pages.dev/PHMP.apk'
 const WEB_URL = 'https://phmp.pages.dev/'
 
 const DownloadPage = () => {
@@ -33,9 +33,9 @@ const DownloadPage = () => {
       icon: Search,
       title: L('2. افتح الملف من شريط الإشعارات', '2. Ouvrez le fichier depuis la barre de notifications', '2. Open the file from the notification bar'),
       text: L(
-        'عند انتهاء التحميل، اسحب شريط الإشعارات واضغط على الملف PharmaCare-Pro.apk. إن لم يظهر، افتح تطبيق «الملفات» ثم مجلد Downloads (التنزيلات) وابحث عنه هناك.',
-        'Une fois le téléchargement terminé, tirez la barre de notifications et appuyez sur le fichier PharmaCare-Pro.apk. S\u2019il n\u2019apparaît pas, ouvrez l\u2019application « Fichiers » puis le dossier Downloads et recherchez-le.',
-        'When the download completes, pull down the notification bar and tap the PharmaCare-Pro.apk file. If it does not appear, open the "Files" app, go to the Downloads folder and look for it there.'
+        'عند انتهاء التحميل، اسحب شريط الإشعارات واضغط على الملف PHMP.apk. إن لم يظهر، افتح تطبيق «الملفات» ثم مجلد Downloads (التنزيلات) وابحث عنه هناك.',
+        'Une fois le téléchargement terminé, tirez la barre de notifications et appuyez sur le fichier PHMP.apk. S\u2019il n\u2019apparaît pas, ouvrez l\u2019application « Fichiers » puis le dossier Downloads et recherchez-le.',
+        'When the download completes, pull down the notification bar and tap the PHMP.apk file. If it does not appear, open the "Files" app, go to the Downloads folder and look for it there.'
       ),
     },
     {
@@ -113,9 +113,9 @@ const DownloadPage = () => {
           <h1 className="text-3xl font-bold text-gray-900">{t('downloadApp')}</h1>
           <p className="text-gray-600 mt-2 max-w-2xl mx-auto leading-relaxed">
             {L(
-              'كل ما تحتاجه للوصول إلى منصة PharmaCare Pro: نسخة الويب الفورية على أي جهاز، أو تطبيق أندرويد رسمي بخطوات تثبيت واضحة خطوة بخطوة.',
-              'Tout ce qu\u2019il faut pour accéder à PharmaCare Pro : la version web immédiate sur tout appareil, ou l\u2019application Android officielle avec un guide d\u2019installation pas à pas.',
-              'Everything you need to access PharmaCare Pro: the instant web version on any device, or the official Android app with a clear step-by-step installation guide.'
+              'كل ما تحتاجه للوصول إلى منصة Pharmacy Management Platform PHMP: نسخة الويب الفورية على أي جهاز، أو تطبيق أندرويد رسمي بخطوات تثبيت واضحة خطوة بخطوة.',
+              'Tout ce qu\u2019il faut pour accéder à Pharmacy Management Platform PHMP : la version web immédiate sur tout appareil, ou l\u2019application Android officielle avec un guide d\u2019installation pas à pas.',
+              'Everything you need to access Pharmacy Management Platform PHMP: the instant web version on any device, or the official Android app with a clear step-by-step installation guide.'
             )}
           </p>
         </div>
@@ -182,7 +182,7 @@ const DownloadPage = () => {
             <Download className="w-5 h-5" />
             {L('تحميل التطبيق لأندرويد (APK)', 'Télécharger pour Android (APK)', 'Download for Android (APK)')}
           </a>
-          <p className="text-[11px] text-gray-400" dir="ltr">PharmaCare-Pro.apk • v1.3.0+ • ~4 MB • Android 8.0+</p>
+          <p className="text-[11px] text-gray-400" dir="ltr">PHMP.apk • v1.3.0+ • ~4 MB • Android 8.0+</p>
         </section>
 
         {/* ===== خطوات التثبيت ===== */}

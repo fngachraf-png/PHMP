@@ -1,7 +1,7 @@
-// PharmaCare Pro - Service Worker
+// Pharmacy Management Platform PHMP - Service Worker
 // Strategy: Network-first for HTML, Cache-first for assets
-const CACHE_NAME = 'pharmacare-v2'
-const STATIC_CACHE = 'pharmacare-static-v2'
+const CACHE_NAME = 'phmp-v3'
+const STATIC_CACHE = 'phmp-static-v3'
 
 const STATIC_ASSETS = [
   '/',

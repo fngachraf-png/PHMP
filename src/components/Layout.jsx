@@ -67,7 +67,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             <Stethoscope className="w-6 h-6 text-white" />
           </div>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-gray-900">{t('appName')}</h1>
+            <h1 className="text-lg font-bold text-gray-900">{t('appShortName')}</h1>
             <p className="text-xs text-gray-500">{currentPharmacy ? pickName(currentPharmacy) : (isSuperAdmin ? t('allPharmacies') : 'Pharmacy System')}</p>
           </div>
           <button onClick={onClose} className="lg:hidden p-2 rounded-lg hover:bg-gray-100" aria-label="Close menu">

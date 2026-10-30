@@ -112,7 +112,7 @@ const Login = () => {
               <Stethoscope className="w-9 h-9 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{t('appName')}</h1>
+              <h1 className="text-3xl font-bold text-gray-900">{t('appShortName')}</h1>
               <p className="text-sm text-gray-600">{t('appTagline')}</p>
             </div>
           </div>
@@ -161,7 +161,7 @@ const Login = () => {
               <Stethoscope className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">{t('appName')}</h1>
+              <h1 className="text-xl font-bold text-gray-900">{t('appShortName')}</h1>
               <p className="text-xs text-gray-600">{t('appTagline')}</p>
             </div>
           </div>

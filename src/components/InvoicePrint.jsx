@@ -179,7 +179,7 @@ const InvoicePrint = ({ sale, mode = 'invoice' }) => {
           <div style={{ fontWeight: 700, color: '#111827' }}>{t('thanksMsg')}</div>
           {sale.needsPrescription && <div style={{ marginTop: 3 }}>{t('invoiceFooter')}</div>}
           <div style={{ marginTop: 3 }}>
-            {t('appName')} • {new Date().getFullYear()} — PHMP
+            {t('appName')} — {new Date().getFullYear()}
           </div>
         </div>
       </div>

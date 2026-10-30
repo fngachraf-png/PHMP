@@ -1,0 +1,38 @@
+name: 🤖 نشر مساعد PHMP (Worker + Workers AI)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/cloudflare/phmp-assistant/**'
+      - '.github/workflows/assistant-deploy.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-assistant:
+    name: نشر Worker المساعد على Cloudflare
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 🚀 نشر Worker (Workers AI — نموذج مجاني)
+        working-directory: infra/cloudflare/phmp-assistant
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@3 deploy 2>&1 | tee deploy.log
+          URL=$(grep -o 'https://phmp-assistant[^.]*\.workers\.dev' deploy.log | head -1 || true)
+          echo "assistant_url=${URL}" >> $GITHUB_ENV
+          if [ -n "$URL" ]; then
+            echo "✅ العنوان العام: $URL"
+            # فحص الجاهزية (بلا إلحاح — النشر قد يحتاج ثواني للتفعيل)
+            sleep 10
+            curl -sf "$URL/health" && echo " — health OK" || echo "⚠️ health لم يستجب بعد (سيتفعّل خلال لحظات)"
+          fi

@@ -109,11 +109,22 @@ const Reports = () => {
   }, [productsData])
 
   const productStats = useMemo(() => {
+    // حل اسم الدواء حسب لغة الواجهة (إصلاح الترجمة في الرسوم):
+    // نبحث عن المنتج الأصلي في قاعدة البيانات (بمعرف productId) ونستعمل
+    // pickName الذي يختار الاسم المناسب للغة (name/nameAr/nameFr/nameEn)،
+    // وإن لم نجد المنتج نستعمل حقول سطر البيع نفسه بنفس سلسلة الأولويات.
+    const resolveName = (item) => {
+      const product = item.productId ? productsData.find((p) => p.id === item.productId) : null
+      if (product) return pickName(product)
+      if (language === 'ar') return item.name || item.nameAr || item.nameEn || item.nameFr || ''
+      if (language === 'fr') return item.nameFr || item.nameEn || item.name || item.nameAr || ''
+      return item.nameEn || item.nameFr || item.name || item.nameAr || ''
+    }
     const map = {}
     periodSales.forEach((sale) => {
       (sale.items || []).forEach((item) => {
         const key = item.productId || item.name
-        if (!map[key]) map[key] = { name: item.name, quantity: 0, revenue: 0, cost: 0 }
+        if (!map[key]) map[key] = { name: resolveName(item), quantity: 0, revenue: 0, cost: 0 }
         map[key].quantity += item.quantity
         map[key].revenue += item.total ?? item.price * item.quantity
         map[key].cost += (costMap[item.productId] ?? 0) * item.quantity
@@ -124,7 +135,7 @@ const Reports = () => {
       profit: p.revenue - p.cost,
       margin: p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0,
     })).sort((a, b) => b.revenue - a.revenue)
-  }, [periodSales, costMap])
+  }, [periodSales, costMap, productsData, pickName, language])
 
   const cogs = productStats.reduce((s, p) => s + p.cost, 0)
   const grossProfit = kpi.netSales - cogs
@@ -148,8 +159,11 @@ const Reports = () => {
       const m = sale.paymentMethod || 'other'
       methods[m] = (methods[m] || 0) + sale.total
     })
+    // ترجمة طريقة الدفع: مفاتيح i18n (cash/card/transfer/insurance/on_delivery/other)
+    // مع سقوط آمن على القيمة الخام إن ظهرت طريقة غير معروفة
+    const label = (m) => (t(m) !== m ? t(m) : m)
     return Object.entries(methods).map(([name, value], i) => ({
-      name: t(name) !== name ? t(name) : name,
+      name: label(name),
       value: Math.round(value),
       color: chart.series[i % chart.series.length],
     }))
@@ -718,7 +732,7 @@ const Reports = () => {
           </tbody>
         </table>
         <div style={{ textAlign: 'center', fontSize: 10, color: '#6b7280', marginTop: 16 }}>
-          {t('appName')} • PHMP — {new Date().getFullYear()}
+          {t('appName')} — {new Date().getFullYear()}
         </div>
       </div>
     </div>

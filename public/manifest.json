@@ -1,7 +1,7 @@
 {
-  "name": "PharmaCare Pro",
-  "short_name": "PharmaCare",
-  "description": "Professional Pharmacy Management System",
+  "name": "Pharmacy Management Platform PHMP",
+  "short_name": "PHMP",
+  "description": "منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP — نظام إدارة الصيدليات الإحترافي",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",

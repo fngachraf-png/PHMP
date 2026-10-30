@@ -32,8 +32,8 @@ const PublicLayout = ({ children, active }) => {
               <Stethoscope className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0">
-              <h1 className="font-bold text-gray-900 truncate">{t('appName')}</h1>
-              <p className="text-[11px] text-gray-500 truncate">PHMP • {t('appTagline')}</p>
+              <h1 className="font-bold text-gray-900 truncate">{t('appShortName')}</h1>
+              <p className="text-[11px] text-gray-500 truncate">{t('appTagline')}</p>
             </div>
           </Link>
 

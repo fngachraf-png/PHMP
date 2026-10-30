@@ -1,7 +1,7 @@
 {
   "name": "phmp-server",
   "version": "1.0.0",
-  "description": "PHMP PharmaCare Pro - Local SQLite API server",
+  "description": "منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP - Local SQLite API server",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

@@ -1,4 +1,4 @@
-// Mock data for PharmaCare Pro - realistic pharmacy data
+// Mock data for Pharmacy Management Platform PHMP - realistic pharmacy data
 export const pharmacies = [
   {
     id: 'ph1',
@@ -9,7 +9,7 @@ export const pharmacies = [
     addressEn: 'Hassan II Avenue, Casablanca',
     addressFr: 'Avenue Hassan II, Casablanca',
     phone: '+212 522 123 456',
-    email: 'alnoor@pharmacare.ma',
+    email: 'alnoor@phmp.ma',
     license: 'PH-2024-001',
     logo: '💊',
     color: 'emerald'
@@ -23,7 +23,7 @@ export const pharmacies = [
     addressEn: 'Maarif District, Rabat',
     addressFr: 'Quartier Maarif, Rabat',
     phone: '+212 537 765 432',
-    email: 'alshifa@pharmacare.ma',
+    email: 'alshifa@phmp.ma',
     license: 'PH-2024-002',
     logo: '⚕️',
     color: 'blue'
@@ -37,7 +37,7 @@ export const pharmacies = [
     addressEn: 'Mohammed V Street, Marrakech',
     addressFr: 'Rue Mohammed V, Marrakech',
     phone: '+212 524 333 999',
-    email: 'alhayat@pharmacare.ma',
+    email: 'alhayat@phmp.ma',
     license: 'PH-2024-003',
     logo: '🏥',
     color: 'purple'
@@ -216,6 +216,7 @@ const generateSales = () => {
       items.push({
         productId: product.id,
         name: product.name,
+        nameEn: product.nameEn, // لعرض الاسم حسب لغة الواجهة في التقارير والرسوم
         price: product.price,
         quantity: qty,
         total: product.price * qty

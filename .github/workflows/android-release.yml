@@ -176,27 +176,27 @@ jobs:
 
       - name: 📦 تجهيز ملف التوزيع
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk PharmaCare-Pro.apk
-          sha256sum PharmaCare-Pro.apk > PharmaCare-Pro.apk.sha256
-          ls -lh PharmaCare-Pro.apk
+          cp android/app/build/outputs/apk/release/app-release.apk PHMP.apk
+          sha256sum PHMP.apk > PHMP.apk.sha256
+          ls -lh PHMP.apk
 
       - name: 🚀 نشر إصدار GitHub (رابط التحميل الدائم)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: "PharmaCare Pro ${{ steps.version.outputs.tag }}"
+          name: "منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP ${{ steps.version.outputs.tag }}"
           body: |
-            # 📱 PharmaCare Pro — إصدار أندرويد ${{ steps.version.outputs.tag }}
+            # 📱 منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP — إصدار أندرويد ${{ steps.version.outputs.tag }}
 
             **التوقيع**: CN=TARIK CHOUIKA (شهادة صلاحيتها 30 سنة)
 
             ## ⬇️ التحميل المباشر العام (دائم — يحمل دائماً أحدث إصدار)
             ```
-            https://phmp-download.pages.dev/PharmaCare-Pro.apk
+            https://phmp-download.pages.dev/PHMP.apk
             ```
 
             > رابط GitHub (لأعضاء المستودع):
-            > `https://github.com/fngachraf-png/PHMP/releases/latest/download/PharmaCare-Pro.apk`
+            > `https://github.com/fngachraf-png/PHMP/releases/latest/download/PHMP.apk`
 
             ## ✨ مستجدات هذا الإصدار
             - 🇫🇷 اللغة الفرنسية كاملة (عربي / فرنسي / إنجليزي)
@@ -212,12 +212,12 @@ jobs:
             - دعم المزامنة مع قاعدة البيانات المحلية SQLite عبر النفق الدائم
 
             ## 🔧 التثبيت
-            1. حمّل ملف `PharmaCare-Pro.apk`
+            1. حمّل ملف `PHMP.apk`
             2. فعّل "التثبيت من مصادر غير معروفة" في هاتفك إن طُلب
             3. ثبّت وافتح التطبيق
           files: |
-            PharmaCare-Pro.apk
-            PharmaCare-Pro.apk.sha256
+            PHMP.apk
+            PHMP.apk.sha256
           make_latest: true
 
       # =====================================================================
@@ -230,15 +230,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           mkdir -p apk-public
-          cp PharmaCare-Pro.apk apk-public/
-          cp PharmaCare-Pro.apk.sha256 apk-public/ 2>/dev/null || true
+          cp PHMP.apk apk-public/
+          cp PHMP.apk.sha256 apk-public/ 2>/dev/null || true
           cat > apk-public/index.html << 'HTML'
           <!doctype html>
           <html lang="ar" dir="rtl">
           <head>
             <meta charset="UTF-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>PharmaCare Pro — تحميل التطبيق</title>
+            <title>منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP — تحميل التطبيق</title>
             <style>
               body { font-family: system-ui, 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg,#ecfdf5,#d1fae5); min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
               .card { background: #fff; border-radius: 24px; box-shadow: 0 20px 50px rgba(5,150,105,.25); padding: 40px; text-align: center; max-width: 420px; }
@@ -253,9 +253,9 @@ jobs:
           <body>
             <div class="card">
               <div class="logo">💊</div>
-              <h1>PharmaCare Pro — PHMP</h1>
+              <h1>منصة PHMP</h1>
               <p>تطبيق إدارة الصيدليات وشراء الدواء<br/>وقّع بشهادة CN=TARIK CHOUIKA (30 سنة)</p>
-              <a class="btn" href="/PharmaCare-Pro.apk">⬇️ تحميل آخر إصدار (APK)</a>
+              <a class="btn" href="/PHMP.apk">⬇️ تحميل آخر إصدار (APK)</a>
               <small>هذا الرابط يقدم دائماً أحدث إصدار تلقائياً</small>
             </div>
           </body>
@@ -263,4 +263,4 @@ jobs:
           HTML
           npx --yes wrangler@3 pages project create phmp-download --production-branch main 2>/dev/null || echo "ℹ️ المشروع موجود مسبقاً"
           npx --yes wrangler@3 pages deploy apk-public --project-name=phmp-download --branch=main --commit-dirty=true
-          echo "🌐 الرابط العام الدائم: https://phmp-download.pages.dev/PharmaCare-Pro.apk"
+          echo "🌐 الرابط العام الدائم: https://phmp-download.pages.dev/PHMP.apk"

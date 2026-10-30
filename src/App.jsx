@@ -20,6 +20,7 @@ import Guide from './pages/Guide'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 import DownloadPage from './pages/Download'
+import PHMPAssistant from './components/chatbot/PHMPAssistant'
 
 const ProtectedRoute = ({ children, permission }) => {
   const { currentUser, hasPermission } = useApp()
@@ -79,6 +80,8 @@ export default function App() {
     <AppProvider>
       <BrowserRouter>
         <AppRoutes />
+        {/* مساعد PHMP — متاح للجميع: موظفون / زبناء مسجلون / زبناء عابرون */}
+        <PHMPAssistant />
       </BrowserRouter>
     </AppProvider>
   )

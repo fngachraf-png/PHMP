@@ -70,11 +70,13 @@ const Dashboard = () => {
   ]
 
   // Top selling products
+  // (نحل اسم الدواء حسب لغة الواجهة عبر المنتج الأصلي — إصلاح ترجمة القوائم)
   const productSales = {}
   salesData.forEach(sale => {
     sale.items.forEach(item => {
       if (!productSales[item.productId]) {
-        productSales[item.productId] = { name: item.name, quantity: 0, revenue: 0 }
+        const product = item.productId ? productsData.find(p => p.id === item.productId) : null
+        productSales[item.productId] = { name: product ? pickName(product) : item.name, quantity: 0, revenue: 0 }
       }
       productSales[item.productId].quantity += item.quantity
       productSales[item.productId].revenue += item.total

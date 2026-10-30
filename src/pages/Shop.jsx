@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import CheckoutModal from '../components/CheckoutModal'
@@ -40,6 +40,20 @@ const Shop = () => {
   const [myOrdersOpen, setMyOrdersOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [toast, setToast] = useState('')
+
+  // دعم رابط البحث المباشر ?q= (من بطاقات دواء «مساعد PHMP» وغيرها)
+  const [searchParams] = useSearchParams()
+  const urlQueryRef = useRef('')
+  useEffect(() => {
+    const q = searchParams.get('q')
+    if (q) {
+      urlQueryRef.current = q
+      setSearchQuery(q)
+      // إن اختار الزبون صيدلية مسبقاً ننتقل مباشرة لشاشة التصفح
+      if (pharmacyId) setStep('browse')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const pharmacy = pharmaciesData.find(p => p.id === pharmacyId)
   const Arrow = isRTL ? ArrowLeft : ArrowRight
@@ -143,7 +157,7 @@ const Shop = () => {
         {pharmaciesData.map(ph => (
           <button
             key={ph.id}
-            onClick={() => { setPharmacyId(ph.id); setStep('browse'); setSearchQuery(''); setCart([]) }}
+            onClick={() => { setPharmacyId(ph.id); setStep('browse'); setSearchQuery(urlQueryRef.current); setCart([]) }}
             className="card p-5 text-start hover:shadow-lg hover:-translate-y-1 transition-all group"
           >
             <div className="flex items-start gap-3">
@@ -279,7 +293,7 @@ const Shop = () => {
             </div>
             <div className="min-w-0">
               <h1 className="font-bold text-gray-900 truncate">{t('shopTitle')}</h1>
-              <p className="text-[11px] text-gray-500 truncate">{t('appName')} • PHMP</p>
+              <p className="text-[11px] text-gray-500 truncate">{t('appShortName')} • {t('appTagline')}</p>
             </div>
           </div>
 

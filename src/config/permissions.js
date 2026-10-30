@@ -1,4 +1,4 @@
-// نظام الصلاحيات RBAC - منصة PharmaCare Pro
+// نظام الصلاحيات RBAC - منصة Pharmacy Management Platform PHMP
 // الأدوار: سوبر أدمين (مالك المنصة) > أدمن > محاسب > صيدلاني > كاشير
 
 export const ROLES = {

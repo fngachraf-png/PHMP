@@ -25,9 +25,9 @@ if (passwordsFile) {
 }
 
 const pharmacies = [
-  { id: 'ph1', name: 'صيدلية النور / Al Noor Pharmacy', nameEn: 'Al Noor Pharmacy', address: 'شارع الحسن الثاني، الدار البيضاء', phone: '+212 522 123 456', email: 'alnoor@pharmacare.ma', license: 'PH-2024-001', logo: '💊', color: 'emerald' },
-  { id: 'ph2', name: 'صيدلية الشفاء / Al Shifa Pharmacy', nameEn: 'Al Shifa Pharmacy', address: 'حي المعاريف، الرباط', phone: '+212 537 765 432', email: 'alshifa@pharmacare.ma', license: 'PH-2024-002', logo: '⚕️', color: 'blue' },
-  { id: 'ph3', name: 'صيدلية الحياة / Al Hayat Pharmacy', nameEn: 'Al Hayat Pharmacy', address: 'زنقة محمد الخامس، مراكش', phone: '+212 524 333 999', email: 'alhayat@pharmacare.ma', license: 'PH-2024-003', logo: '🏥', color: 'purple' },
+  { id: 'ph1', name: 'صيدلية النور / Al Noor Pharmacy', nameEn: 'Al Noor Pharmacy', address: 'شارع الحسن الثاني، الدار البيضاء', phone: '+212 522 123 456', email: 'alnoor@phmp.ma', license: 'PH-2024-001', logo: '💊', color: 'emerald' },
+  { id: 'ph2', name: 'صيدلية الشفاء / Al Shifa Pharmacy', nameEn: 'Al Shifa Pharmacy', address: 'حي المعاريف، الرباط', phone: '+212 537 765 432', email: 'alshifa@phmp.ma', license: 'PH-2024-002', logo: '⚕️', color: 'blue' },
+  { id: 'ph3', name: 'صيدلية الحياة / Al Hayat Pharmacy', nameEn: 'Al Hayat Pharmacy', address: 'زنقة محمد الخامس، مراكش', phone: '+212 524 333 999', email: 'alhayat@phmp.ma', license: 'PH-2024-003', logo: '🏥', color: 'purple' },
 ]
 
 // كلمات المرور الافتراضية - يجب تغييرها في الإنتاج

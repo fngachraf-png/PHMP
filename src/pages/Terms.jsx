@@ -3,7 +3,7 @@ import PublicLayout from '../components/PublicLayout'
 import { FileText, CircleCheck } from 'lucide-react'
 
 // =====================================================================
-// شروط الاستخدام — PHMP PharmaCare Pro
+// شروط الاستخدام — منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP
 // مرجعية: القانون 31.08 (المعاملات الإلكترونية) + 09.08 (حماية المعطيات)
 // + 17.04 (مدونة الأدوية والصيدلة) + 53.05 (التبادل الإلكتروني للمعطيات)
 // =====================================================================
@@ -16,9 +16,9 @@ const Terms = () => {
     {
       title: L('1. التعريفات', '1. Définitions', '1. Definitions'),
       body: L(
-        '« المنصة »: تطبيق PharmaCare Pro (PHMP) الرقمي لإدارة الصيدليات وطلب الأدوية. « الصيدلية »: صيدلية مرخصة لها من طرف الوزارة المكلفة بالصحة ومسجلة في المنصة. « الزبون »: كل شخص يطلب دواء عبر واجهة المتجر سواء كزبون عابر أو مشترك. « الموظف »: كل شخص يعمل داخل الصيدلية بحساب وصلاحيات محددة (مدير، صيدلاني، كاشير، محاسب). « المالك »: المشغل الرقمي للمنصة.',
-        '« La plateforme » : l\u2019application PharmaCare Pro (PHMP) de gestion de pharmacies et de commande de médicaments. « La pharmacie » : officine agréée par le Ministère de la Santé et inscrite sur la plateforme. « Le client » : toute personne commandant un médicament via la boutique, invité ou membre. « L\u2019employé » : toute personne travaillant dans la pharmacie avec un compte et des permissions (gérant, pharmacien, caissier, comptable). « Le propriétaire » : l\u2019opérateur numérique de la plateforme.',
-        '“The Platform”: the PharmaCare Pro (PHMP) digital application for pharmacy management and medicine ordering. “The Pharmacy”: a pharmacy licensed by the Ministry of Health and registered on the Platform. “The Customer”: any person ordering medicine via the shop interface, guest or member. “The Staff”: any person working within the pharmacy with an account and defined permissions (manager, pharmacist, cashier, accountant). “The Owner”: the platform’s digital operator.'
+        '« المنصة »: تطبيق منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP الرقمي لإدارة الصيدليات وطلب الأدوية. « الصيدلية »: صيدلية مرخصة لها من طرف الوزارة المكلفة بالصحة ومسجلة في المنصة. « الزبون »: كل شخص يطلب دواء عبر واجهة المتجر سواء كزبون عابر أو مشترك. « الموظف »: كل شخص يعمل داخل الصيدلية بحساب وصلاحيات محددة (مدير، صيدلاني، كاشير، محاسب). « المالك »: المشغل الرقمي للمنصة.',
+        '« La plateforme » : l\u2019application منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP de gestion de pharmacies et de commande de médicaments. « La pharmacie » : officine agréée par le Ministère de la Santé et inscrite sur la plateforme. « Le client » : toute personne commandant un médicament via la boutique, invité ou membre. « L\u2019employé » : toute personne travaillant dans la pharmacie avec un compte et des permissions (gérant, pharmacien, caissier, comptable). « Le propriétaire » : l\u2019opérateur numérique de la plateforme.',
+        '“The Platform”: the منصة نظام إدارة الصيدلية فارماسي ماناجمنت پلاتفورم PHMP digital application for pharmacy management and medicine ordering. “The Pharmacy”: a pharmacy licensed by the Ministry of Health and registered on the Platform. “The Customer”: any person ordering medicine via the shop interface, guest or member. “The Staff”: any person working within the pharmacy with an account and defined permissions (manager, pharmacist, cashier, accountant). “The Owner”: the platform’s digital operator.'
       ),
     },
     {
