@@ -210,7 +210,7 @@ const LiveOrders = () => {
                     {selected.customer?.type === 'member' && selected.customer?.idPhoto && (
                       <button onClick={() => setViewingPhoto({ src: selected.customer.idPhoto, label: t('viewIdPhoto') })}
                         className="btn-secondary text-xs py-1.5 w-full">
-                        <BadgeCheck className="w-3.5 h-3.5 text-emerald-600" /> {t('viewIdPhoto')} — {t('memberBadge')}
+                        <BadgeCheck className="w-3.5 h-3.5 text-emerald-600" /> {t('viewIdPhoto')} · {t('memberBadge')}
                       </button>
                     )}
                     {selected.needsPrescription && selected.prescriptionPhoto && (
@@ -288,7 +288,7 @@ const LiveOrders = () => {
                 )}
                 {(selected.status === 'ready' || selected.status === 'dispatched') && (
                   <button onClick={() => advanceStatus(selected, 'completed')} className="btn-primary w-full">
-                    <CheckCheck className="w-4 h-4" /> {t('markCompleted')} — {t('generateInvoice')}
+                    <CheckCheck className="w-4 h-4" /> {t('markCompleted')} · {t('generateInvoice')}
                   </button>
                 )}
                 {selected.status === 'completed' && (

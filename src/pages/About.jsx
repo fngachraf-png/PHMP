@@ -34,7 +34,7 @@ const About = () => {
       icon: Zap,
       title: L('الاتصال المباشر الفوري', 'Connexion directe instantanée', 'Instant Direct Connection'),
       text: L(
-        'طلبات الزبناء تصل إلى الصيدلية فوراً عبر قناة اتصال مباشر مشفرة محلياً، والدردشة بين الطرفين تُستهلك مباشرة دون تسجيلها في خوادم المنصة — خصوصية تامة.',
+        'طلبات الزبناء تصل إلى الصيدلية فوراً عبر قناة اتصال مباشر مشفرة محلياً، والدردشة بين الطرفين تُستهلك مباشرة دون تسجيلها في خوادم المنصة؛ خصوصية تامة.',
         'Les commandes clients parviennent instantanément à la pharmacie via un canal direct local, et le chat entre les deux parties est consommé en direct sans être enregistré sur nos serveurs.',
         'Customer orders reach the pharmacy instantly via a local direct channel, and chat between both parties is consumed live without being recorded on our servers.'
       ),
@@ -52,9 +52,9 @@ const About = () => {
       icon: Sparkles,
       title: L('تقنية حديثة وموثوقة', 'Technologie moderne et fiable', 'Modern & Reliable Technology'),
       text: L(
-        'تعمل المنصة بنمط مستقل كلياً (كل البيانات في جهازك) مع إمكانية الربط بخادم محلي SQLite خاص بالصيدلية للنسخ الاحتياطي والمزامنة — بياناتك تبقى ملكك.',
-        'La plateforme fonctionne en mode autonome (données stockées sur votre appareil) avec possibilité de connexion à un serveur local SQLite pour sauvegarde et synchronisation — vos données restent les vôtres.',
-        'The platform runs fully standalone (all data on your device) with optional connection to a local SQLite server for backup and sync — your data stays yours.'
+        'تعمل المنصة بنمط مستقل كلياً (كل البيانات في جهازك) مع إمكانية الربط بخادم محلي SQLite خاص بالصيدلية للنسخ الاحتياطي والمزامنة؛ بياناتك تبقى ملكك.',
+        'La plateforme fonctionne en mode autonome (données stockées sur votre appareil) avec possibilité de connexion à un serveur local SQLite pour sauvegarde et synchronisation ; vos données restent les vôtres.',
+        'The platform runs fully standalone (all data on your device) with optional connection to a local SQLite server for backup and sync; your data stays yours.'
       ),
     },
   ]
@@ -64,9 +64,9 @@ const About = () => {
       icon: Users,
       title: L('للزبناء', 'Pour les clients', 'For Customers'),
       items: L(
-        ['اطلب دواءك من صيدليات معتمدة بدون تنقل', 'تتبع طلبك لحظة بلحظة', 'دفع عند الاستلام — بدون مخاطر', 'دردشة مباشرة مع الصيدلي'],
-        ['Commandez vos médicaments en pharmacie agréée sans vous déplacer', 'Suivez votre commande en temps réel', 'Paiement à la livraison — sans risque', 'Chat direct avec le pharmacien'],
-        ['Order medicine from licensed pharmacies without travel', 'Track your order in real time', 'Pay on delivery — no risk', 'Direct chat with the pharmacist']
+        ['اطلب دواءك من صيدليات معتمدة بدون تنقل', 'تتبع طلبك لحظة بلحظة', 'دفع عند الاستلام بلا مخاطر', 'دردشة مباشرة مع الصيدلي'],
+        ['Commandez vos médicaments en pharmacie agréée sans vous déplacer', 'Suivez votre commande en temps réel', 'Paiement à la livraison, sans risque', 'Chat direct avec le pharmacien'],
+        ['Order medicine from licensed pharmacies without travel', 'Track your order in real time', 'Pay on delivery, no risk', 'Direct chat with the pharmacist']
       ),
     },
     {

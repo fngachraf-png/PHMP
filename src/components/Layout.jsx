@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package, FileText, Users, Truck,
   Receipt, BarChart3, Settings, LogOut, Menu, X, Bell,
-  Stethoscope, Crown, Scale, Building2, Wifi, WifiOff, Home, Inbox
+  Scale, Crown, Building2, Wifi, WifiOff, Home, Inbox
 } from 'lucide-react'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useApp } from '../contexts/AppContext'
@@ -10,23 +10,7 @@ import { ROLE_INFO } from '../config/permissions'
 import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
 import SmartAvatar, { isImage } from './SmartAvatar'
-
-// علامة مائية خفيفة للوغو المنصة على جميع صفحات التطبيق
-// (غير تفاعلية — لا تؤثر على القراءة ولا تظهر في الطباعة)
-const PlatformWatermark = ({ isRTL }) => (
-  <img
-    src="/logo-watermark.png"
-    alt=""
-    aria-hidden="true"
-    className="fixed z-0 pointer-events-none select-none print:hidden"
-    style={{
-      bottom: '4%',
-      [isRTL ? 'left' : 'right']: '4%',
-      width: 'clamp(120px, 18vw, 220px)',
-      opacity: 0.05,
-    }}
-  />
-)
+import PlatformLogo, { PlatformWatermark } from './PlatformLogo'
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { t, isRTL, currentPharmacy, currentUser, logout, language, hasPermission, isSuperAdmin, activePharmacyId, switchPharmacy, pharmaciesData, serverStatus, visibleOrders, pickName } = useApp()
@@ -79,11 +63,9 @@ const Sidebar = ({ isOpen, onClose }) => {
         ${isOpen ? 'translate-x-0' : isRTL ? 'translate-x-full' : '-translate-x-full'}
         lg:translate-x-0 flex flex-col
       `}>
-        {/* Logo */}
+        {/* لوغو المنصة الرسمي (يتبدل حسب الوضع الفاتح/القاتم) */}
         <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-200">
-          <div className="w-11 h-11 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-primary-500/30">
-            <Stethoscope className="w-6 h-6 text-white" />
-          </div>
+          <PlatformLogo size={46} withFrame alt="PHMP" />
           <div className="flex-1">
             <h1 className="text-lg font-bold text-gray-900">{t('appShortName')}</h1>
             <p className="text-xs text-gray-500">{currentPharmacy ? pickName(currentPharmacy) : (isSuperAdmin ? t('allPharmacies') : 'Pharmacy System')}</p>

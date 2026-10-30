@@ -314,7 +314,7 @@ const PHMPAssistant = () => {
           }
         }}
         aria-label={t('assistantOpen')}
-        className={`fixed bottom-5 end-5 z-[70] w-14 h-14 rounded-full gradient-primary text-white shadow-xl shadow-primary-600/40 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 ${open ? 'scale-90 opacity-90' : ''}`}
+        className={`fixed bottom-[3.75rem] lg:bottom-5 end-5 z-[70] w-14 h-14 rounded-full gradient-primary text-white shadow-xl shadow-primary-600/40 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 ${open ? 'scale-90 opacity-90' : ''}`}
       >
         {open ? <X className="w-6 h-6" /> : (
           /* لوغو المساعد الرسمي كأيقونة إطلاق */
@@ -333,7 +333,7 @@ const PHMPAssistant = () => {
           dir={isRTL ? 'rtl' : 'ltr'}
           role="dialog"
           aria-label={t('assistantName')}
-          className="fixed bottom-[5.5rem] end-5 z-[70] w-[min(calc(100vw-2.5rem),380px)] h-[min(72vh,580px)] rounded-2xl bg-white border border-gray-200 shadow-2xl overflow-hidden flex flex-col"
+          className="fixed bottom-[8rem] lg:bottom-[5.5rem] end-5 z-[70] w-[min(calc(100vw-2.5rem),380px)] h-[min(72vh,580px)] rounded-2xl bg-white border border-gray-200 shadow-2xl overflow-hidden flex flex-col"
         >
           {/* الترويسة */}
           <div className="gradient-primary px-4 py-3 text-white flex items-center gap-3 flex-shrink-0">
@@ -472,7 +472,7 @@ const PHMPAssistant = () => {
                     ? t('assistantCustomerChatRequest')
                     : (staffPresence
                         ? t('assistantConnectingYou').replace('{role}', staffRoleLabel) + ' ' + staffPresence.name
-                        : t('assistantNoStaff') + ' — ' + t('assistantEscalateIntro'))}
+                        : t('assistantNoStaff') + ' · ' + t('assistantEscalateIntro'))}
                 </span>
               </div>
               <div className="flex-1 min-h-0 p-3 overflow-y-auto">

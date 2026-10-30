@@ -27,9 +27,9 @@ const Privacy = () => {
       icon: FileCheck,
       title: L('بيانات الزبون المشترك', 'Données du client membre', 'Member customer data'),
       items: L(
-        ['الاسم الكامل + رقم الهاتف', 'صورة وثيقة الهوية (إلزامية للتحقق من الأدوية المقيدة)', 'العنوان (اختياري — للتوصيل)'],
-        ['Nom complet + téléphone', 'Photo de pièce d\u2019identité (obligatoire pour les médicaments réservés)', 'Adresse (optionnelle — livraison)'],
-        ['Full name + phone number', 'ID document photo (mandatory for restricted medicines)', 'Address (optional — for delivery)']
+        ['الاسم الكامل + رقم الهاتف', 'صورة وثيقة الهوية (إلزامية للتحقق من الأدوية المقيدة)', 'العنوان (اختياري، للتوصيل)'],
+        ['Nom complet + téléphone', 'Photo de pièce d\u2019identité (obligatoire pour les médicaments réservés)', 'Adresse (optionnelle, pour la livraison)'],
+        ['Full name + phone number', 'ID document photo (mandatory for restricted medicines)', 'Address (optional, for delivery)']
       ),
       note: L('تُحفظ محلياً لدى الصيدلية لأغراض التحقق القانوني وفق القانون 17.04، ولا تُرسل إلى أي خادم خارجي.', 'Stockées localement chez la pharmacie pour vérification légale selon la loi 17.04 ; aucune transmission à un serveur externe.', 'Stored locally at the pharmacy for legal verification per Law 17.04; never sent to any external server.'),
     },
@@ -170,15 +170,15 @@ const Privacy = () => {
           </div>
           <h2 className="text-3xl font-bold text-gray-900">{t('privacyPolicy')}</h2>
           <p className="text-sm text-gray-500">
-            {L('آخر تحديث: أكتوبر 2026 — النسخة 1.0', 'Dernière mise à jour : octobre 2026 — Version 1.0', 'Last updated: October 2026 — Version 1.0')}
+            {L('آخر تحديث: أكتوبر 2026 · النسخة 1.0', 'Dernière mise à jour : octobre 2026 · Version 1.0', 'Last updated: October 2026 · Version 1.0')}
           </p>
         </div>
 
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800 leading-relaxed">
           {L(
-            'مبدؤنا الأساسي: « محلي أولاً ». تعمل هذه المنصة بدون خادم مركزي — طلباتك ومحادثاتك تسير مباشرة إلى الصيدلية وتُستهلك فورياً، وبياناتك تبقى في جهازك أو جهاز الصيدلية المعنية فقط.',
-            'Notre principe fondamental : « local d\u2019abord ». Cette plateforme fonctionne sans serveur central — vos commandes et conversations vont directement à la pharmacie et sont consommées en direct ; vos données restent sur votre appareil ou celui de la pharmacie concernée uniquement.',
-            'Our core principle: “local-first”. This platform runs without a central server — your orders and chats go directly to the pharmacy and are consumed live; your data stays on your device or the concerned pharmacy\u2019s device only.'
+            'مبدؤنا الأساسي: « محلي أولاً ». تعمل هذه المنصة بدون خادم مركزي؛ طلباتك ومحادثاتك تسير مباشرة إلى الصيدلية وتُستهلك فورياً، وبياناتك تبقى في جهازك أو جهاز الصيدلية المعنية فقط.',
+            'Notre principe fondamental : « local d\u2019abord ». Cette plateforme fonctionne sans serveur central ; vos commandes et conversations vont directement à la pharmacie et sont consommées en direct ; vos données restent sur votre appareil ou celui de la pharmacie concernée uniquement.',
+            'Our core principle: “local-first”. This platform runs without a central server; your orders and chats go directly to the pharmacy and are consumed live; your data stays on your device or the concerned pharmacy\u2019s device only.'
           )}
         </div>
 

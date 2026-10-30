@@ -24,9 +24,9 @@ const Terms = () => {
     {
       title: L('2. قبول الشروط', '2. Acceptation des conditions', '2. Acceptance of Terms'),
       body: L(
-        'باستعمالك المنصة — تصفحاً أو طلباً أو إدارةً — فإنك تقر بمطالعتك لهذه الشروط وقبولها كاملة. إذا لم توافق على أي بند منها، يرجى التوقف عن استعمال المنصة. تحتفظ إدارة المنصة بحق تحديث هذه الشروط في أي وقت، ويُعتبَر استمرار الاستعمال بعد التحديث قبولاً للنسخة الجديدة.',
-        'En utilisant la plateforme — navigation, commande ou gestion — vous reconnaissez avoir lu et accepté l\u2019intégralité de ces conditions. Si vous n\u2019acceptez pas une clause, veuillez cesser d\u2019utiliser la plateforme. L\u2019administration se réserve le droit de mettre à jour ces conditions à tout moment ; la poursuite de l\u2019utilisation vaut acceptation de la nouvelle version.',
-        'By using the Platform — browsing, ordering, or managing — you acknowledge having read and accepted these Terms in full. If you disagree with any clause, please stop using the Platform. The administration reserves the right to update these Terms at any time; continued use after an update constitutes acceptance of the new version.'
+        'باستعمالك المنصة (تصفحاً أو طلباً أو إدارةً) فإنك تقر بمطالعتك لهذه الشروط وقبولها كاملة. إذا لم توافق على أي بند منها، يرجى التوقف عن استعمال المنصة. تحتفظ إدارة المنصة بحق تحديث هذه الشروط في أي وقت، ويُعتبَر استمرار الاستعمال بعد التحديث قبولاً للنسخة الجديدة.',
+        'En utilisant la plateforme (navigation, commande ou gestion), vous reconnaissez avoir lu et accepté l\u2019intégralité de ces conditions. Si vous n\u2019acceptez pas une clause, veuillez cesser d\u2019utiliser la plateforme. L\u2019administration se réserve le droit de mettre à jour ces conditions à tout moment ; la poursuite de l\u2019utilisation vaut acceptation de la nouvelle version.',
+        'By using the Platform (browsing, ordering, or managing), you acknowledge having read and accepted these Terms in full. If you disagree with any clause, please stop using the Platform. The administration reserves the right to update these Terms at any time; continued use after an update constitutes acceptance of the new version.'
       ),
     },
     {
@@ -120,7 +120,7 @@ const Terms = () => {
           </div>
           <h2 className="text-3xl font-bold text-gray-900">{t('termsOfUse')}</h2>
           <p className="text-sm text-gray-500">
-            {L('آخر تحديث: أكتوبر 2026 — النسخة 1.0', 'Dernière mise à jour : octobre 2026 — Version 1.0', 'Last updated: October 2026 — Version 1.0')}
+            {L('آخر تحديث: أكتوبر 2026 · النسخة 1.0', 'Dernière mise à jour : octobre 2026 · Version 1.0', 'Last updated: October 2026 · Version 1.0')}
           </p>
         </div>
 

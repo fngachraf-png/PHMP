@@ -217,7 +217,7 @@ const CheckoutModal = ({ open, onClose, cart, subtotal, hasRxItems, pharmacy, on
                           <button key={acc.id} type="button"
                             onClick={() => { setFullName(acc.fullName); setPhone(acc.phone) }}
                             className="w-full text-start px-2 py-1.5 rounded hover:bg-white text-sm">
-                            👤 {acc.fullName} — <span dir="ltr">{acc.phone}</span>
+                            👤 {acc.fullName} · <span dir="ltr">{acc.phone}</span>
                           </button>
                         ))}
                       </div>

@@ -139,7 +139,7 @@ const Legal = () => {
                     className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 underline underline-offset-4"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    {t('legalOpenSource')} — {ref.sourceLabel}
+                    {t('legalOpenSource')} · {ref.sourceLabel}
                   </a>
                 </div>
               )}

@@ -5,6 +5,8 @@ import { api } from '../lib/api'
 import { Stethoscope, Lock, User as UserIcon, Eye, EyeOff, ShieldCheck, Pill, Sparkles, Building2, ShoppingBag, Wifi, WifiOff, Loader2 } from 'lucide-react'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import ThemeToggle from '../components/ThemeToggle'
+import PlatformLogo, { PlatformWatermark } from '../components/PlatformLogo'
+import PublicFooter from '../components/PublicFooter'
 
 // صفحة دخول الموظفين — المصادقة عبر الخادم المحلي (SQLite + JWT + bcrypt)
 // الحسابات التجريبية أُزيلت: الدخول متاح فقط بحسابات رسمية أنشأها مالك المنصة.
@@ -96,6 +98,9 @@ const Login = () => {
         ))}
       </div>
 
+      {/* العلامة المائية للوغو المنصة (مثل باقي الصفحات) */}
+      <PlatformWatermark isRTL={isRTL} />
+
       {/* شريط علوي داخل تدفق الصفحة: اللغة + الوضع الفاتح/الداكن
           (كان مبدل اللغة مثبتاً بشكل مطلق فوق البطاقة فيتداخل معها على الهاتف) */}
       <div className="relative z-20 w-full flex flex-wrap items-center justify-end gap-2 py-1">
@@ -108,9 +113,7 @@ const Login = () => {
         {/* Left side - branding */}
         <div className="hidden lg:block space-y-6 animate-slide-up">
           <div className="flex items-center gap-3">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white border border-primary-100 flex items-center justify-center shadow-2xl shadow-primary-500/40">
-              <img src="/logo.png" alt="PHMP" className="w-full h-full object-cover" />
-            </div>
+            <PlatformLogo size={64} withFrame alt="PHMP" />
             <div>
               <h1 className="text-3xl font-bold text-gray-900">{t('appShortName')}</h1>
               <p className="text-sm text-gray-600">{t('appTagline')}</p>
@@ -127,9 +130,9 @@ const Login = () => {
 
           <p className="text-lg text-gray-600 max-w-md">
             {L(
-              'نظام متكامل لإدارة المخزون، المبيعات، الوصفات الطبية، والمزيد - كل ذلك في مكان واحد.',
-              'Un système complet pour la gestion des stocks, des ventes, des ordonnances et plus encore — tout en un seul endroit.',
-              'A comprehensive system for inventory management, sales, prescriptions, and more — all in one place.'
+              'نظام متكامل لإدارة المخزون، المبيعات، الوصفات الطبية، والمزيد، كل ذلك في مكان واحد.',
+              'Un système complet pour la gestion des stocks, des ventes, des ordonnances et plus encore, tout en un seul endroit.',
+              'A comprehensive system for inventory management, sales, prescriptions, and more, all in one place.'
             )}
           </p>
 
@@ -157,9 +160,7 @@ const Login = () => {
         <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl border border-white/40 dark:border-white/10 p-8 lg:p-10 animate-slide-up">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-primary-100 flex items-center justify-center shadow-lg">
-              <img src="/logo.png" alt="PHMP" className="w-full h-full object-cover" />
-            </div>
+            <PlatformLogo size={48} withFrame alt="PHMP" />
             <div>
               <h1 className="text-xl font-bold text-gray-900">{t('appShortName')}</h1>
               <p className="text-xs text-gray-600">{t('appTagline')}</p>
@@ -263,20 +264,17 @@ const Login = () => {
             className="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-primary-500 bg-primary-50 text-primary-700 hover:bg-primary-100 font-bold transition-all"
           >
             <ShoppingBag className="w-5 h-5" />
-            {t('customerEntrance')} — {t('shopTitle')}
+            {t('customerEntrance')} · {t('shopTitle')}
           </Link>
 
-          {/* روابط الصفحات العامة */}
-          <div className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-400">
-            <Link to="/shop" className="hover:text-primary-600 transition-colors">{t('shopTitle')}</Link>
-            <Link to="/download" className="hover:text-primary-600 transition-colors">{t('downloadApp')}</Link>
-            <Link to="/about" className="hover:text-primary-600 transition-colors">{t('aboutUs')}</Link>
-            <Link to="/guide" className="hover:text-primary-600 transition-colors">{t('howToUse')}</Link>
-            <Link to="/terms" className="hover:text-primary-600 transition-colors">{t('termsOfUse')}</Link>
-            <Link to="/privacy" className="hover:text-primary-600 transition-colors">{t('privacyPolicy')}</Link>
-          </div>
+          {/* روابط الصفحات العامة أصبحت في التذييل الموحد أسفل الصفحة */}
         </div>
       </div>
+      </div>
+
+      {/* تذييل موحد — مطابق لباقي صفحات المنصة */}
+      <div className="relative z-10 -mx-4 -mb-4 mt-4">
+        <PublicFooter />
       </div>
     </div>
   )

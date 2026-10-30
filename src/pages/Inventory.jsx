@@ -186,7 +186,7 @@ const Inventory = () => {
           { label: t('all'), value: stats.total, color: 'blue', icon: Layers },
           { label: t('inStock'), value: stats.inStock, color: 'emerald', icon: Box },
           { label: t('lowStock'), value: stats.lowStock, color: 'amber', icon: TrendingDown },
-          { label: t('outOfStock'), value: stats.outOfStock, color: 'red', icon: X },
+          { label: t('outOfStockItems'), value: stats.outOfStock, color: 'red', icon: X },
           { label: t('expiringSoon'), value: stats.expiring, color: 'purple', icon: Calendar },
           { label: t('totalInDatabase'), value: fullDrugDatabase?.length || 0, color: 'indigo', icon: Package },
         ].map((stat, i) => {
@@ -488,7 +488,7 @@ const Inventory = () => {
                             <span className="flex-1 min-w-0">
                               <span className="block text-sm font-semibold text-gray-900 truncate">
                                 {d.nameEn || d.name}
-                                {d.dci && <span className="text-[11px] font-normal text-gray-500"> — {d.dci}</span>}
+                                {d.dci && <span className="text-[11px] font-normal text-gray-500"> · {d.dci}</span>}
                               </span>
                               <span className="block text-[11px] text-gray-500 truncate">
                                 {d.dosage ? `${d.dosage} • ` : ''}{d.presentation || d.form || ''}

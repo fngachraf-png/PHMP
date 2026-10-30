@@ -62,7 +62,7 @@ export const fr = {
   invalidCredentials: 'Identifiants incorrects',
   loginServerUnreachable: 'Impossible de joindre le serveur de la plateforme. Vérifiez votre connexion ou l’état du serveur local, puis réessayez.',
   serverChecking: 'Vérification de la connexion au serveur...',
-  loginRealAccountsNote: 'Connexion avec les comptes officiels du personnel — nécessite une connexion au serveur',
+  loginRealAccountsNote: 'Connexion avec les comptes officiels du personnel ; nécessite une connexion au serveur',
   downloadApp: 'Télécharger l’application',
 
   // Navigation
@@ -252,6 +252,8 @@ export const fr = {
 
   // Footer
   allRightsReserved: 'Tous droits réservés',
+  footerBrand: 'Plateforme de Gestion de Pharmacie PHMP',
+  notSpecified: 'Non spécifié',
   developedBy: 'Développé par',
 
   // ===== Pages publiques et navigation =====
@@ -265,7 +267,7 @@ export const fr = {
   legalPages: 'Pages légales',
   staffAccess: 'Accès personnel',
   footerMission: 'Une plateforme marocaine reliant les clients aux pharmacies agréées : commandez vos médicaments en toute confiance.',
-  footerLegalNote: 'La plateforme est un intermédiaire technique — la délivrance des médicaments reste soumise à la loi 17.04',
+  footerLegalNote: 'La plateforme est un intermédiaire technique ; la délivrance des médicaments reste soumise à la loi 17.04',
 
   // Extended categories
   gastro: 'Gastro-entérologie',
@@ -300,7 +302,7 @@ export const fr = {
   guestCustomer: 'Client de passage',
   memberCustomer: 'Client inscrit',
   continueAsGuest: 'Continuer sans inscription',
-  guestNote: 'Sans inscription — saisissez simplement votre nom et téléphone',
+  guestNote: 'Sans inscription ; saisissez simplement votre nom et téléphone',
   memberLogin: 'Connexion client inscrit',
   switchIdentity: "Changer l'identité du client",
   memberRegister: 'Créer un nouveau compte',
@@ -334,16 +336,16 @@ export const fr = {
   pickupAtPharmacy: 'Retrait à la pharmacie',
   pickupNote: 'Retirez votre commande à la pharmacie',
   deliveryByCustomer: 'Livraison organisée par moi',
-  deliveryByCustomerNote: 'Vous organisez vous-même la livraison — à vos frais',
+  deliveryByCustomerNote: 'Vous organisez vous-même la livraison ; à vos frais',
   deliveryByPharmacy: 'Livraison par la pharmacie',
   deliveryByPharmacyNote: 'La pharmacie organise la livraison à votre adresse',
   deliveryFeeNote: 'Les frais de port et de livraison sont à la charge du client',
   placeOrder: 'Envoyer la commande',
   orderPlacedSuccess: 'Votre commande a été envoyée à la pharmacie',
   connectingToStaff: 'Connexion avec le personnel disponible...',
-  directConnectionNote: 'Connexion directe via la plateforme entre le client et la pharmacie — consommée en direct, non enregistrée sur le serveur',
+  directConnectionNote: 'Connexion directe via la plateforme entre le client et la pharmacie ; consommée en direct, non enregistrée sur le serveur',
   connectedWith: 'Connecté avec',
-  preferredStaffRx: 'Commande avec ordonnance — à privilégier pour le pharmacien',
+  preferredStaffRx: 'Commande avec ordonnance ; à privilégier pour le pharmacien',
   preferredStaff: 'Personnel recommandé',
   myOrders: 'Mes commandes',
   orderNumber: 'N° de commande',
@@ -403,7 +405,7 @@ export const fr = {
   deliveryFee: 'Frais de livraison',
   grandTotal: 'Total à payer',
   amountDue: 'Montant dû',
-  thanksMsg: 'Merci de votre confiance — prompt rétablissement',
+  thanksMsg: 'Merci de votre confiance et prompt rétablissement',
   invoiceFooter: "Les ordonnances sont conservées par la pharmacie conformément à la loi 17.04",
   printInvoice: 'Imprimer la facture',
   printDeliveryNote: 'Imprimer le bon de livraison',
@@ -437,7 +439,7 @@ export const fr = {
   paymentMethods: 'Moyens de paiement',
   inventoryValueCost: 'Valeur du stock (coût)',
   inventoryValueRetail: 'Valeur du stock (vente)',
-  outOfStock: 'Ruptures de stock',
+  outOfStockItems: 'Ruptures de stock',
   expiringIn30: 'Périme sous 30 jours',
   unitCost: 'Prix d’achat',
   salePrice: 'Prix de vente',
@@ -453,7 +455,7 @@ export const fr = {
   assistantTagline: 'Votre assistant intelligent dans la plateforme PHMP',
   assistantWelcomeStaff: 'Bonjour {name} 👋 Je suis l’Assistant PHMP, expert de la plateforme et de la réglementation pharmaceutique marocaine. Interrogez-moi sur les médicaments, le stock, les rapports, les permissions ou tout service de la plateforme.',
   assistantWelcomeCustomer: 'Bonjour {name} 👋 Je suis l’Assistant PHMP. Je recherche les médicaments par nom scientifique ou commercial (même mal orthographié) et je réponds sur les ordonnances, la livraison et le remboursement. Comment puis-je vous aider ?',
-  assistantWelcomeGuest: 'Bonjour 👋 Je suis l’Assistant PHMP — assistant de la plateforme de gestion de pharmacie. Je peux rechercher n’importe quel médicament de la liste officielle marocaine (5 917 médicaments) et vous aider à commander et à vous faire livrer. Tapez un nom de médicament ou posez une question.',
+  assistantWelcomeGuest: 'Bonjour 👋 Je suis l’Assistant PHMP, assistant de la plateforme de gestion de pharmacie. Je peux rechercher n’importe quel médicament de la liste officielle marocaine (5 917 médicaments) et vous aider à commander et à vous faire livrer. Tapez un nom de médicament ou posez une question.',
   assistantPlaceholder: 'Tapez un médicament ou posez une question...',
   assistantDisclaimer: 'L’assistant fournit des informations sur les services de la plateforme et les médicaments ; il ne remplace pas l’avis du pharmacien ou du médecin.',
   assistantOffTopic: 'Je suis l’Assistant PHMP : je réponds uniquement aux questions sur les médicaments, la pharmacie et les services de la plateforme (commande, ordonnances, livraison, stock, rapports...). Reformulez votre question ou demandez le pharmacien.',
@@ -461,7 +463,7 @@ export const fr = {
   assistantStaffOnline: 'Un employé est en ligne',
   assistantNoStaff: 'Aucun employé en ligne actuellement',
   assistantConnectingYou: 'Connexion avec {role}...',
-  assistantConnected: 'Connecté à un employé de la pharmacie — discussion directe, non enregistrée',
+  assistantConnected: 'Connecté à un employé de la pharmacie ; discussion directe, non enregistrée',
   assistantEscalateIntro: 'Je peux vous mettre en relation directement avec le pharmacien ou le caissier (selon disponibilité) pour une consultation immédiate.',
   assistantTyping: 'L’assistant écrit...',
   assistantQuickDrugs: 'Rechercher un médicament',
@@ -497,7 +499,7 @@ export const fr = {
   assistantOpen: 'Ouvrir l’Assistant PHMP',
   assistantReplyThanks: "Avec plaisir ! 😊 Puis-je vous aider à retrouver un médicament ou un autre service ?",
   assistantReplyBye: "Au revoir ! Rouvrez l’assistant dès que besoin. 🌿",
-  assistantAskDrugName: "Tapez le nom du médicament (commercial ou DCI — même mal orthographié) : je le corrige et affiche sa fiche officielle de la liste marocaine.",
+  assistantAskDrugName: "Tapez le nom du médicament (commercial ou DCI, même mal orthographié) : je le corrige et affiche sa fiche officielle de la liste marocaine.",
   assistantGenericGuidance: "Je peux vous aider à : rechercher des médicaments et corriger leurs noms, les règles d’ordonnance, la livraison, la commande et le suivi, les prix officiels et le remboursement, et les lois en vigueur. Tapez un nom de médicament ou choisissez un sujet.",
   assistantNewMsg: 'Nouveau message de l’Assistant PHMP',
   // ===== Photos et logos (v1.8.0) =====
@@ -509,6 +511,6 @@ export const fr = {
   customerPhotoHint: 'Affichée sur votre compte et vos commandes',
   // ===== Sélecteur officiel (liste CNSS et Ministère) =====
   officialCatalogPicker: 'Ajout rapide depuis la liste officielle',
-  officialCatalogSearchHint: 'Rechercher par nom commercial, DCI ou code-barres — ex. : doliprane, AUGMENTIN, 61117…',
-  officialCatalogNote: 'Liste officielle marocaine unifiée avec la liste CNSS des médicaments remboursables — cliquez sur un résultat pour remplir le formulaire automatiquement.',
+  officialCatalogSearchHint: 'Rechercher par nom commercial, DCI ou code-barres (ex. : doliprane, AUGMENTIN, 61117…)',
+  officialCatalogNote: 'Liste officielle marocaine unifiée avec la liste CNSS des médicaments remboursables ; cliquez sur un résultat pour remplir le formulaire automatiquement.',
 }

@@ -384,7 +384,7 @@ const Settings = () => {
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{t('lastSync')}</p>
                   <p className="text-xs text-gray-500" dir="ltr">
-                    {serverStatus.lastSync ? new Date(serverStatus.lastSync).toLocaleString() : '—'}
+                    {serverStatus.lastSync ? new Date(serverStatus.lastSync).toLocaleString() : t('notSpecified')}
                   </p>
                 </div>
                 <button

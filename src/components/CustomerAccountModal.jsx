@@ -159,7 +159,7 @@ const CustomerAccountModal = ({ open, onClose }) => {
                       <button key={acc.id} type="button"
                         onClick={() => { setFullName(acc.fullName); setPhone(acc.phone) }}
                         className="w-full text-start px-2 py-1.5 rounded hover:bg-white text-sm flex items-center gap-2">
-                        <SmartAvatar value={acc.photo} alt={acc.fullName} size={24} rounded="rounded-full" textClass="text-base" fallback="👤" /> {acc.fullName} — <span dir="ltr">{acc.phone}</span>
+                        <SmartAvatar value={acc.photo} alt={acc.fullName} size={24} rounded="rounded-full" textClass="text-base" fallback="👤" /> {acc.fullName} · <span dir="ltr">{acc.phone}</span>
                       </button>
                     ))}
                   </div>

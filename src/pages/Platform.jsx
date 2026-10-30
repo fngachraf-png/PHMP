@@ -306,7 +306,7 @@ const Platform = () => {
             {t('platform')}
           </h1>
           <p className="text-sm text-gray-600 mt-1">
-            {language === 'ar' ? 'لوحة تحكم مالك المنصة - إشراف شامل على جميع الصيدليات والمستخدمين' : language === 'fr' ? 'Panneau de contrôle du propriétaire — supervision complète de toutes les pharmacies et utilisateurs' : 'Platform owner control panel - full oversight of all pharmacies and users'}
+            {language === 'ar' ? 'لوحة تحكم مالك المنصة؛ إشراف شامل على جميع الصيدليات والمستخدمين' : language === 'fr' ? 'Panneau de contrôle du propriétaire ; supervision complète de toutes les pharmacies et utilisateurs' : 'Platform owner control panel; full oversight of all pharmacies and users'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -480,7 +480,7 @@ const Platform = () => {
                         <span className="inline-flex items-center gap-1.5 align-middle"><SmartAvatar value={ph.logo} alt={pickName(ph)} size={22} rounded="rounded-lg" fallback="💊" textClass="text-base" />{pickName(ph)}</span>
                       </td>
                       <td className="py-3 px-2 text-gray-600" dir="ltr">{ph.license}</td>
-                      <td className="py-3 px-2 text-gray-600">{ph.address?.split('،').pop()?.trim() || '—'}</td>
+                      <td className="py-3 px-2 text-gray-600">{ph.address?.split('،').pop()?.trim() || t('notSpecified')}</td>
                       <td className="py-3 px-2 text-gray-600" dir="ltr">{ph.phone}</td>
                       <td className="py-3 px-2">
                         <span className="badge badge-primary">{phUsers.length}</span>
@@ -566,7 +566,7 @@ const Platform = () => {
                         </span>
                       </td>
                       <td className="py-3 px-2 text-gray-600">
-                        {u.role === 'super_admin' ? '👑 ' + t('allPharmacies') : (ph ? <span className="inline-flex items-center gap-1"><SmartAvatar value={ph.logo} alt="" size={18} rounded="rounded-md" fallback="💊" textClass="text-sm" />{pickName(ph)}</span> : '—')}
+                        {u.role === 'super_admin' ? '👑 ' + t('allPharmacies') : (ph ? <span className="inline-flex items-center gap-1"><SmartAvatar value={ph.logo} alt="" size={18} rounded="rounded-md" fallback="💊" textClass="text-sm" />{pickName(ph)}</span> : t('notSpecified'))}
                       </td>
                       <td className="py-3 px-2">
                         <button
@@ -621,7 +621,7 @@ const Platform = () => {
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-600">{roleLabel(u.role)} • {u.role === 'super_admin' ? t('allPharmacies') : (ph ? (isRTL ? ph.name.split(' /')[0] : ph.nameEn) : '—')}</p>
+                    <p className="text-xs text-gray-600">{roleLabel(u.role)} • {u.role === 'super_admin' ? t('allPharmacies') : (ph ? (isRTL ? ph.name.split(' /')[0] : ph.nameEn) : t('notSpecified'))}</p>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleToggleActive(u)}

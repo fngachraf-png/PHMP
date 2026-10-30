@@ -2,6 +2,8 @@ import { Link, useLocation } from 'react-router-dom'
 import { useApp } from '../contexts/AppContext'
 import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
+import PlatformLogo, { PlatformWatermark } from './PlatformLogo'
+import PublicFooter from './PublicFooter'
 import { Store, Info, BookOpen, FileText, ShieldCheck, Lock, Download } from 'lucide-react'
 
 // =====================================================================
@@ -28,9 +30,7 @@ const PublicLayout = ({ children, active }) => {
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-gray-200 safe-top">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-3">
           <Link to="/shop" className="flex items-center gap-2.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/30 bg-white border border-primary-100">
-              <img src="/logo.png" alt="PHMP" className="w-full h-full object-cover" />
-            </div>
+            <PlatformLogo size={40} withFrame alt="PHMP" />
             <div className="min-w-0">
               <h1 className="font-bold text-gray-900 truncate">{t('appShortName')}</h1>
               <p className="text-[11px] text-gray-500 truncate">{t('appTagline')}</p>
@@ -87,60 +87,15 @@ const PublicLayout = ({ children, active }) => {
       </header>
 
       {/* ===== العلامة المائية للمنصة ===== */}
-      <img
-        src="/logo-watermark.png"
-        alt=""
-        aria-hidden="true"
-        className="fixed z-0 pointer-events-none select-none print:hidden"
-        style={{
-          bottom: '4%',
-          [isRTL ? 'left' : 'right']: '4%',
-          width: 'clamp(120px, 18vw, 220px)',
-          opacity: 0.05,
-        }}
-      />
+      <PlatformWatermark isRTL={isRTL} />
 
       {/* ===== المحتوى ===== */}
       <main className="max-w-4xl w-full mx-auto p-4 pb-16 safe-bottom flex-1 relative z-[1]">
         {children}
       </main>
 
-      {/* ===== التذييل ===== */}
-      <footer className="border-t border-gray-200 bg-gray-50/50">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <img src="/logo.png" alt="PHMP" className="w-6 h-6 rounded-md object-cover" />
-                <span className="font-bold text-gray-900">{t('appName')}</span>
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">{t('footerMission')}</p>
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900 mb-2 text-xs uppercase tracking-wider">{t('quickLinks')}</p>
-              <div className="flex flex-col gap-1.5">
-                {navItems.map(item => (
-                  <Link key={item.key} to={item.to} className="text-gray-500 hover:text-primary-600 text-xs transition-colors">
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900 mb-2 text-xs uppercase tracking-wider">{t('staffAccess')}</p>
-              <Link to="/login" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors">
-                <Lock className="w-3.5 h-3.5" /> {t('staffLoginBtn')}
-              </Link>
-              <p className="text-[11px] text-gray-400 mt-3 leading-relaxed" dir={isRTL ? 'rtl' : 'ltr'}>
-                {t('footerLegalNote')}
-              </p>
-            </div>
-          </div>
-          <p className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
-            © {new Date().getFullYear()} {t('appName')} — {t('allRightsReserved')}
-          </p>
-        </div>
-      </footer>
+      {/* ===== التذييل الموحد ===== */}
+      <PublicFooter />
     </div>
   )
 }

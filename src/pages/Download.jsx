@@ -73,7 +73,7 @@ const DownloadPage = () => {
       a: L(
         'لتصفح المتجر وإرسال الطلبات ودخول الموظفين نعم، يلزم اتصال بالإنترنت لأن المنصة متصلة بخادم الصيدلية المحلي عبر نفق آمن. الواجهة نفسها خفيفة جداً وتعمل بسلاسة حتى على شبكات 3G.',
         'Pour parcourir la boutique, envoyer des commandes et la connexion du personnel, oui : une connexion Internet est nécessaire car la plateforme communique avec le serveur local de la pharmacie via un tunnel sécurisé. L\u2019interface est très légère et fonctionne fluidement même en 3G.',
-        'For browsing the shop, sending orders and staff sign-in, yes — an internet connection is required because the platform communicates with the pharmacy\u2019s local server through a secure tunnel. The interface itself is very light and runs smoothly even on 3G.'
+        'For browsing the shop, sending orders and staff sign-in, yes: an internet connection is required because the platform communicates with the pharmacy\u2019s local server through a secure tunnel. The interface itself is very light and runs smoothly even on 3G.'
       ),
     },
     {
@@ -87,17 +87,17 @@ const DownloadPage = () => {
     {
       q: L('ما هي المتطلبات الدنيا للأندرويد؟', 'Quelles sont les configurations Android minimales ?', 'What are the minimum Android requirements?'),
       a: L(
-        'أندرويد 8.0 (Oreo) أو أحدث، حوالي 100 ميغابايت من المساحة الحرة، وأي معالج حديث. التطبيق يعمل أيضاً على الأجهزة الاقتصادية واللوحات الإلكترونية (Tablettes) — وهو مناسب جداً للاستعمال على مكتب الصيدلية.',
-        'Android 8.0 (Oreo) ou ultérieur, environ 100 Mo d\u2019espace libre et n\u2019importe quel processeur récent. L\u2019application fonctionne aussi sur les appareils économiques et les tablettes — idéal pour le comptoir de la pharmacie.',
-        'Android 8.0 (Oreo) or newer, about 100 MB of free space, and any modern processor. The app also runs on budget devices and tablets — ideal for the pharmacy counter.'
+        'أندرويد 8.0 (Oreo) أو أحدث، حوالي 100 ميغابايت من المساحة الحرة، وأي معالج حديث. التطبيق يعمل أيضاً على الأجهزة الاقتصادية واللوحات الإلكترونية (Tablettes)، وهو مناسب جداً للاستعمال على مكتب الصيدلية.',
+        'Android 8.0 (Oreo) ou ultérieur, environ 100 Mo d\u2019espace libre et n\u2019importe quel processeur récent. L\u2019application fonctionne aussi sur les appareils économiques et les tablettes ; idéal pour le comptoir de la pharmacie.',
+        'Android 8.0 (Oreo) or newer, about 100 MB of free space, and any modern processor. The app also runs on budget devices and tablets, ideal for the pharmacy counter.'
       ),
     },
     {
-      q: L('فشل التثبيت — ماذا أفعل؟', 'L\u2019installation échoue — que faire ?', 'Installation failed — what should I do?'),
+      q: L('فشل التثبيت، ماذا أفعل؟', 'L\u2019installation échoue : que faire ?', 'Installation failed. What should I do?'),
       a: L(
-        'تأكد أولاً أن المساحة كافية (100MB على الأقل) وأن الملف اكتمل تحميله (الحجم النهائي حوالي 4MB وليس 0KB). إن ظهر «التطبيق مثبت بالفعل» فأزل النسخة القديمة من الإعدادات ثم أعد التثبيت. إن استمر الفشل، أعد تحميل الملف من الرابط الرسمي — لا تحمّله من أي مصدر آخر.',
-        'Vérifiez d\u2019abord l\u2019espace disponible (au moins 100 Mo) et que le fichier est complet (environ 4 Mo, pas 0 Ko). Si le message « application déjà installée » apparaît, désinstallez l\u2019ancienne version puis réinstallez. En cas d\u2019échec persistant, retéléchargez depuis le lien officiel — jamais depuis une autre source.',
-        'First check that you have enough space (at least 100 MB) and that the file fully downloaded (about 4 MB, not 0 KB). If it says "app already installed", remove the old version from settings then reinstall. If it keeps failing, re-download from the official link — never from any other source.'
+        'تأكد أولاً أن المساحة كافية (100MB على الأقل) وأن الملف اكتمل تحميله (الحجم النهائي حوالي 4MB وليس 0KB). إن ظهر «التطبيق مثبت بالفعل» فأزل النسخة القديمة من الإعدادات ثم أعد التثبيت. إن استمر الفشل، أعد تحميل الملف من الرابط الرسمي؛ لا تحمّله من أي مصدر آخر.',
+        'Vérifiez d\u2019abord l\u2019espace disponible (au moins 100 Mo) et que le fichier est complet (environ 4 Mo, pas 0 Ko). Si le message « application déjà installée » apparaît, désinstallez l\u2019ancienne version puis réinstallez. En cas d\u2019échec persistant, retéléchargez depuis le lien officiel ; jamais depuis une autre source.',
+        'First check that you have enough space (at least 100 MB) and that the file fully downloaded (about 4 MB, not 0 KB). If it says "app already installed", remove the old version from settings then reinstall. If it keeps failing, re-download from the official link; never from any other source.'
       ),
     },
   ]
@@ -128,7 +128,7 @@ const DownloadPage = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">
-                {L('الخيار الأول: نسخة الويب — بدون تثبيت', 'Option 1 : version web — sans installation', 'Option 1: Web version — no installation')}
+                {L('الخيار الأول: نسخة الويب بلا تثبيت', 'Option 1 : version web, sans installation', 'Option 1: Web version, no installation')}
               </h2>
               <p className="text-sm text-gray-500">
                 {L('تعمل فوراً على أي هاتف أو حاسوب أو لوحة إلكترونية', 'Fonctionne immédiatement sur téléphone, ordinateur ou tablette', 'Works instantly on any phone, computer or tablet')}
@@ -137,9 +137,9 @@ const DownloadPage = () => {
           </div>
           <p className="text-sm text-gray-600 leading-relaxed mb-4">
             {L(
-              'افتح الرابط الرسمي للمنصة في أي متصفح حديث — لا تحتاج إلى تحميل أو تثبيت أي شيء، ولا توجد خطوات تسجيل معقدة للزبناء. كل الميزات متاحة: تصفح الأدوية، إرسال الطلب مع صورة الوصفة، التتبع اللحظي، والدخول كموظف بحسابك الرسمي. لإضافة اختصار يشبه التطبيقات على شاشتك الرئيسية، استعمل خيار «إضافة إلى الشاشة الرئيسية» من قائمة المتصفح.',
-              'Ouvrez le lien officiel de la plateforme dans tout navigateur moderne — aucun téléchargement ni installation, ni inscription compliquée pour les clients. Toutes les fonctionnalités sont disponibles : parcours des médicaments, envoi de commande avec photo d\u2019ordonnance, suivi en temps réel et accès personnel. Pour ajouter un raccourci sur votre écran d\u2019accueil, utilisez « Ajouter à l\u2019écran d\u2019accueil » depuis le menu du navigateur.',
-              'Open the platform\u2019s official link in any modern browser — no download, no installation, and no complicated sign-up for customers. All features are available: browsing medicines, submitting orders with a prescription photo, real-time tracking, and staff sign-in with your official account. To add an app-like shortcut to your home screen, use "Add to Home Screen" from the browser menu.'
+              'افتح الرابط الرسمي للمنصة في أي متصفح حديث؛ لا تحتاج إلى تحميل أو تثبيت أي شيء، ولا توجد خطوات تسجيل معقدة للزبناء. كل الميزات متاحة: تصفح الأدوية، إرسال الطلب مع صورة الوصفة، التتبع اللحظي، والدخول كموظف بحسابك الرسمي. لإضافة اختصار يشبه التطبيقات على شاشتك الرئيسية، استعمل خيار «إضافة إلى الشاشة الرئيسية» من قائمة المتصفح.',
+              'Ouvrez le lien officiel de la plateforme dans tout navigateur moderne ; aucun téléchargement ni installation, ni inscription compliquée pour les clients. Toutes les fonctionnalités sont disponibles : parcours des médicaments, envoi de commande avec photo d\u2019ordonnance, suivi en temps réel et accès personnel. Pour ajouter un raccourci sur votre écran d\u2019accueil, utilisez « Ajouter à l\u2019écran d\u2019accueil » depuis le menu du navigateur.',
+              'Open the platform\u2019s official link in any modern browser: no download, no installation, and no complicated sign-up for customers. All features are available: browsing medicines, submitting orders with a prescription photo, real-time tracking, and staff sign-in with your official account. To add an app-like shortcut to your home screen, use "Add to Home Screen" from the browser menu.'
             )}
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
@@ -172,9 +172,9 @@ const DownloadPage = () => {
           </div>
           <p className="text-sm text-gray-600 leading-relaxed mb-4">
             {L(
-              'تطبيق أندرويد الرسمي للمنصة يفتح نفس الواجهة بملء الشاشة الكاملة (الوضع الغامر) دون شريط متصفح، مع أداء أسرع وأشعار أوثق. الملف موقّع رقمياً بتوقيع ساري 30 سنة باسم مالك المنصة — حمّله فقط من الرابط الرسمي أدناه.',
-              'L\u2019application Android officielle ouvre la même interface en plein écran immersif sans barre de navigateur, avec de meilleures performances. Le fichier est signé numériquement avec un certificat valable 30 ans au nom du propriétaire — téléchargez-le uniquement depuis le lien officiel ci-dessous.',
-              'The official Android app opens the same interface in immersive full screen without a browser bar, with faster performance. The file is digitally signed with a 30-year certificate in the owner\u2019s name — download it only from the official link below.'
+              'تطبيق أندرويد الرسمي للمنصة يفتح نفس الواجهة بملء الشاشة الكاملة (الوضع الغامر) دون شريط متصفح، مع أداء أسرع وأشعار أوثق. الملف موقّع رقمياً بتوقيع ساري 30 سنة باسم مالك المنصة؛ حمّله فقط من الرابط الرسمي أدناه.',
+              'L\u2019application Android officielle ouvre la même interface en plein écran immersif sans barre de navigateur, avec de meilleures performances. Le fichier est signé numériquement avec un certificat valable 30 ans au nom du propriétaire ; téléchargez-le uniquement depuis le lien officiel ci-dessous.',
+              'The official Android app opens the same interface in immersive full screen without a browser bar, with faster performance. The file is digitally signed with a 30-year certificate in the owner\u2019s name; download it only from the official link below.'
             )}
           </p>
           <a href={APK_URL} target="_blank" rel="noopener noreferrer"

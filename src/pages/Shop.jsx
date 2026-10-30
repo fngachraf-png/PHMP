@@ -6,11 +6,12 @@ import CheckoutModal from '../components/CheckoutModal'
 import CustomerAccountModal from '../components/CustomerAccountModal'
 import OrderTracking from '../components/OrderTracking'
 import SmartAvatar from '../components/SmartAvatar'
+import PlatformLogo, { PlatformWatermark } from '../components/PlatformLogo'
+import PublicFooter from '../components/PublicFooter'
 import {
-  Stethoscope, Store, MapPin, Phone, Search, ShoppingCart, Trash2, Plus, Minus,
+  Store, MapPin, Phone, Search, ShoppingCart, Trash2, Plus, Minus,
   ArrowRight, ArrowLeft, PackageSearch, ClipboardList, LogOut, X, BadgeCheck,
-  ShieldCheck, Truck, Stethoscope as StethoscopeIcon, Lock, UserRound,
-  Info, BookOpen, FileText, Download
+  ShieldCheck, Truck, Lock, UserRound, Stethoscope as StethoscopeIcon
 } from 'lucide-react'
 
 // =====================================================================
@@ -282,30 +283,17 @@ const Shop = () => {
   ) : null
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-primary-50/60 via-white to-white">
+    <div className="min-h-[100dvh] bg-gradient-to-b from-primary-50/60 via-white to-white flex flex-col">
       {/* العلامة المائية للوغو المنصة */}
-      <img
-        src="/logo-watermark.png"
-        alt=""
-        aria-hidden="true"
-        className="fixed z-0 pointer-events-none select-none print:hidden"
-        style={{
-          bottom: '4%',
-          [isRTL ? 'left' : 'right']: '4%',
-          width: 'clamp(120px, 18vw, 220px)',
-          opacity: 0.05,
-        }}
-      />
+      <PlatformWatermark isRTL={isRTL} />
       {/* ===== الترويسة ===== */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-gray-200 safe-top">
         <div className="max-w-6xl mx-auto flex items-center gap-3 px-4 h-16">
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-xl overflow-hidden bg-white border border-primary-100 flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/30">
-              <img src="/logo.png" alt="PHMP" className="w-full h-full object-cover" />
-            </div>
+            <PlatformLogo size={40} withFrame alt="PHMP" />
             <div className="min-w-0">
               <h1 className="font-bold text-gray-900 truncate">{t('shopTitle')}</h1>
-              <p className="text-[11px] text-gray-500 truncate">{t('appShortName')} • {t('appTagline')}</p>
+              <p className="text-[11px] text-gray-500 truncate">{t('appShortName')} · {t('appTagline')}</p>
             </div>
           </div>
 
@@ -506,46 +494,8 @@ const Shop = () => {
         </div>
       )}
 
-      {/* تذييل */}
-      <footer className="border-t border-gray-200 bg-gray-50/50">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-sm">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <ShieldCheck className="w-4 h-4 text-primary-600" />
-                <span className="font-bold text-gray-900">{t('appName')}</span>
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">{t('footerMission')}</p>
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900 mb-2 text-xs uppercase tracking-wider">{t('quickLinks')}</p>
-              <div className="flex flex-col gap-1.5">
-                <Link to="/about" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><Info className="w-3.5 h-3.5" /> {t('aboutUs')}</Link>
-                <Link to="/guide" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><BookOpen className="w-3.5 h-3.5" /> {t('howToUse')}</Link>
-                <Link to="/download" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><Download className="w-3.5 h-3.5" /> {t('downloadApp')}</Link>
-              </div>
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900 mb-2 text-xs uppercase tracking-wider">{t('legalPages')}</p>
-              <div className="flex flex-col gap-1.5">
-                <Link to="/terms" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><FileText className="w-3.5 h-3.5" /> {t('termsOfUse')}</Link>
-                <Link to="/privacy" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors"><ShieldCheck className="w-3.5 h-3.5" /> {t('privacyPolicy')}</Link>
-              </div>
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900 mb-2 text-xs uppercase tracking-wider">{t('staffAccess')}</p>
-              <Link to="/login" className="flex items-center gap-1.5 text-gray-500 hover:text-primary-600 text-xs transition-colors">
-                <Lock className="w-3.5 h-3.5" /> {t('staffLoginBtn')}
-              </Link>
-              <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">{t('footerLegalNote')}</p>
-            </div>
-          </div>
-          <p className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-xs text-gray-400">
-            <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> {t('directConnectionNote')}</span>
-            <span>• © {new Date().getFullYear()} {t('appName')} — {t('allRightsReserved')}</span>
-          </p>
-        </div>
-      </footer>
+      {/* تذييل موحد — مطابق لباقي صفحات المنصة */}
+      <PublicFooter />
     </div>
   )
 }

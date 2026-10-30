@@ -300,7 +300,7 @@ const Reports = () => {
           [t('inventoryValueCost'), `${money(inventory.valueCost)} ${t('currency')}`],
           [t('inventoryValueRetail'), `${money(inventory.valueRetail)} ${t('currency')}`],
           [t('lowStockItems'), inventory.low.length],
-          [t('outOfStock'), inventory.out.length],
+          [t('outOfStockItems'), inventory.out.length],
           [t('expiringSoon'), inventory.expiring.length],
         ],
         header: [t('description'), t('quantity'), t('minStock') || 'Min', t('unitCost'), t('salePrice'), t('stockValue')],
@@ -322,7 +322,7 @@ const Reports = () => {
       kpis: [
         [t('expiringIn30'), inventory.expiring.filter((p) => inventory.daysTo(p) <= 30).length],
         [t('expiringSoon'), inventory.expiring.length],
-        [t('outOfStock'), inventory.out.length],
+        [t('outOfStockItems'), inventory.out.length],
       ],
       header: [t('description'), t('expiryDate') || 'Expiry', t('days'), t('quantity')],
       rows: inventory.expiring.slice(0, 100).map((p) => [
@@ -763,7 +763,7 @@ const Reports = () => {
           </tbody>
         </table>
         <div style={{ textAlign: 'center', fontSize: 10, color: '#6b7280', marginTop: 16 }}>
-          {t('appName')} — {new Date().getFullYear()}
+          {t('appName')} · {new Date().getFullYear()}
         </div>
       </div>
     </div>

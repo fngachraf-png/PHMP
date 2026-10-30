@@ -182,9 +182,9 @@ const Guide = () => {
           <h2 className="text-3xl font-bold text-gray-900">{t('howToUse')}</h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
             {L(
-              'دليل مبسط خطوة بخطوة لاستعمال المنصة — للزبناء الراغبين في طلب الدواء، وللموظفين المسيرين للصيدلية.',
-              'Un guide simple étape par étape — pour les clients qui commandent des médicaments et pour le personnel qui gère la pharmacie.',
-              'A simple step-by-step guide — for customers ordering medicine, and for staff managing the pharmacy.'
+              'دليل مبسط خطوة بخطوة لاستعمال المنصة، للزبناء الراغبين في طلب الدواء، وللموظفين المسيرين للصيدلية.',
+              'Un guide simple étape par étape, pour les clients qui commandent des médicaments et pour le personnel qui gère la pharmacie.',
+              'A simple step-by-step guide for customers ordering medicine, and for staff managing the pharmacy.'
             )}
           </p>
         </div>
@@ -197,7 +197,7 @@ const Guide = () => {
             </div>
             <div>
               <h3 className="text-xl font-bold text-gray-900">{L('دليل الزبون: كيف تطلب دواءك؟', 'Guide client : comment commander ?', 'Customer Guide: how to order?')}</h3>
-              <p className="text-xs text-gray-500 flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" /> {L('من الهاتف أو الحاسوب — بدون تسجيل إلزامي', 'Depuis mobile ou ordinateur — sans inscription obligatoire', 'From phone or computer — no mandatory signup')}</p>
+              <p className="text-xs text-gray-500 flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" /> {L('من الهاتف أو الحاسوب بلا تسجيل إلزامي', 'Depuis mobile ou ordinateur, sans inscription obligatoire', 'From phone or computer, no mandatory signup')}</p>
             </div>
           </div>
           <div className="space-y-3">

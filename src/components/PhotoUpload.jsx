@@ -23,7 +23,7 @@ const PhotoUpload = ({ value, onChange, label, hint, required = false, capture =
       const base64 = await compressImage(file, maxDim, 0.75)
       const clear = await isClearEnough(base64, 420)
       if (!clear) {
-        setError(t('error') + ' — ' + (t('idDocumentHint')))
+        setError(t('error') + ' · ' + (t('idDocumentHint')))
         // نعرض الصورة مع تحذير الوضوح، ونترك القرار للمستخدم مع علامة
         onChange(base64, false)
       } else {
