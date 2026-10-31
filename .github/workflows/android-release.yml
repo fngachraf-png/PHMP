@@ -116,7 +116,7 @@ jobs:
           echo "--- MainActivity (immersive) ---"
           grep -c "enableImmersiveMode" android/app/src/main/java/com/phmp/pharmacare/MainActivity.java
 
-      - name: 🎨 نسخ الأيقونات المخصصة (كاملة: raster + adaptive + splash)
+      - name: 🎨 نسخ الأيقونات المخصصة الكاملة (raster + adaptive + splash)
         run: |
           # 1) أيقونات raster (أندرويد < 8)
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
