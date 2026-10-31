@@ -27,5 +27,6 @@ if [[ -z "${CLOUDFLARED:-}" ]]; then
 fi
 
 # منفذ metrics ثابت كي يتحقق الحارس من /ready (cloudflared يختار منفذاً عشوائياً بدونه).
-exec "$CLOUDFLARED" --protocol http2 --no-autoupdate \
+# IPv4 فقط: تهيئة ICMPv6 تعلّق cloudflared بلا اتصالات على شبكة الهاتف (2026-10-31).
+exec "$CLOUDFLARED" --protocol http2 --no-autoupdate --edge-ip-version 4 \
   --metrics 127.0.0.1:20244 tunnel run --token "$TOKEN"
