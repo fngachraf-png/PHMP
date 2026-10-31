@@ -152,6 +152,7 @@ const OrderTracking = ({ order, onCancel }) => {
           who={order.customer?.name}
           role="customer"
           counterpartLabel={staffLabel}
+          pharmacyId={order.pharmacyId}
         />
         <p className="text-[11px] text-center text-gray-400 leading-relaxed">{t('directConnectionNote')}</p>
       </div>

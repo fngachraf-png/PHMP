@@ -21,6 +21,7 @@ import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 import DownloadPage from './pages/Download'
 import PHMPAssistant from './components/chatbot/PHMPAssistant'
+import CallManager from './components/calls/CallManager'
 
 const ProtectedRoute = ({ children, permission }) => {
   const { currentUser, hasPermission } = useApp()
@@ -82,6 +83,8 @@ export default function App() {
         <AppRoutes />
         {/* مساعد PHMP — متاح للجميع: موظفون / زبناء مسجلون / زبناء عابرون */}
         <PHMPAssistant />
+        {/* مدير المكالمات الصوتية/المرئية — اتصال مباشر بين المستخدمين (WebRTC ندّ لند) */}
+        <CallManager />
       </BrowserRouter>
     </AppProvider>
   )

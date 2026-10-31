@@ -177,6 +177,18 @@ export const api = {
     return data
   },
 
+  // ===== نقل ملكية المنصة (سوبر أدمين فقط — تأكيد بكلمة المرور الحالية) =====
+  async transferOwnership({ targetUserId, currentPassword, selfNewRole, selfPharmacyId }) {
+    const res = await authRequest('/api/platform/transfer-ownership', {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId, currentPassword, selfNewRole, selfPharmacyId }),
+      timeout: 12000,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || 'فشل نقل ملكية المنصة')
+    return data
+  },
+
   // ===== الصيدليات =====
   async fetchPharmacies() {
     const res = await request('/api/pharmacies', { timeout: 8000 })

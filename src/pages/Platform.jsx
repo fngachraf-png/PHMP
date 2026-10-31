@@ -7,19 +7,21 @@ import LogoUpload from '../components/LogoUpload'
 import SmartAvatar, { isImage } from '../components/SmartAvatar'
 import {
   Crown, Building2, Users, TrendingUp, ShoppingCart, Plus, Trash2, Pencil,
-  History, ShieldCheck, X, Check, ChevronDown, Activity
+  History, ShieldCheck, X, Check, ChevronDown, Activity, ArrowLeftRight, KeyRound, AlertTriangle
 } from 'lucide-react'
 
 // نافذة إضافة/تعديل مستخدم
 const UserModal = ({ user, onClose }) => {
-  const { t, isRTL, pharmaciesData, addUser, updateUser, usersData, pickName, language, serverStatus } = useApp()
+  const { t, isRTL, pharmaciesData, addUser, updateUser, usersData, pickName, language, serverStatus, currentUser } = useApp()
   const [form, setForm] = useState(user || {
     name: '', username: '', password: '', role: 'pharmacist', pharmacyId: 'ph1', avatar: '👤',
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const roles = Object.entries(ROLE_INFO).filter(([key]) => key !== 'super_admin')
+  // دور «مالك المنصة» متاح في القائمة للسوبر أدمين فقط (إنشاء سوبر أدمين جديد)
+  const iAmSuperAdmin = currentUser?.role === 'super_admin'
+  const roles = Object.entries(ROLE_INFO).filter(([key]) => key !== 'super_admin' || iAmSuperAdmin)
 
   const submit = async () => {
     if (!form.name || !form.username || (!user && !form.password)) {
@@ -98,6 +100,12 @@ const UserModal = ({ user, onClose }) => {
                   <option key={ph.id} value={ph.id}>{ph.logo} {pickName(ph)}</option>
                 ))}
               </select>
+            </div>
+          )}
+          {form.role === 'super_admin' && (
+            <div className="bg-violet-50 border border-violet-200 rounded-lg p-2.5 text-xs text-violet-800 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{t('superAdminRoleNote')}</span>
             </div>
           )}
           {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{error}</p>}
@@ -201,6 +209,155 @@ const PharmacyModal = ({ onClose }) => {
   )
 }
 
+// نافذة نقل ملكية المنصة (سوبر أدمين فقط — عملية حساسة موثّقة)
+const TransferOwnershipModal = ({ onClose }) => {
+  const {
+    t, language, usersData, pharmaciesData, pickName, currentUser,
+    transferOwnership, serverStatus,
+  } = useApp()
+  const [targetUserId, setTargetUserId] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [selfNewRole, setSelfNewRole] = useState('admin') // '' = البقاء سوبر أدمين مشاركاً
+  const [selfPharmacyId, setSelfPharmacyId] = useState(pharmaciesData[0]?.id || '')
+  const [keepAsSuper, setKeepAsSuper] = useState(false)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(null)
+
+  // مرشحو الاستلام: كل المستخدمين النشطين ما عدا حسابي الحالي
+  const candidates = usersData.filter(u => u.id !== currentUser?.id && u.active !== false)
+
+  const selfRoles = ['admin', 'accountant', 'pharmacist', 'cashier'].map(key => {
+    const info = ROLE_INFO[key]
+    return { key, label: language === 'ar' ? info.ar : language === 'fr' ? (info.fr || info.en) : info.en, badge: info.badge }
+  })
+
+  const submit = async () => {
+    if (!targetUserId) { setError(t('transferPickTarget')); return }
+    if (!currentPassword) { setError(t('transferEnterPassword')); return }
+    if (!keepAsSuper && !selfPharmacyId) { setError(t('transferPickPharmacy')); return }
+    const target = usersData.find(u => u.id === targetUserId)
+    const confirmMsg = language === 'ar'
+      ? `تأكيد نقل ملكية المنصة إلى «${target?.name}»؟ لا يمكن التراجع بسهولة.`
+      : language === 'fr'
+        ? `Confirmer le transfert de la propriété de la plateforme à « ${target?.name} » ?`
+        : `Confirm transferring platform ownership to "${target?.name}"?`
+    if (!window.confirm(confirmMsg)) return
+    setSaving(true); setError('')
+    try {
+      const result = await transferOwnership({
+        targetUserId,
+        currentPassword,
+        selfNewRole: keepAsSuper ? 'super_admin' : selfNewRole,
+        selfPharmacyId: keepAsSuper ? undefined : selfPharmacyId,
+      })
+      setDone(result)
+    } catch (err) {
+      setError(err?.message || (language === 'ar' ? 'فشل نقل الملكية' : language === 'fr' ? 'Échec du transfert' : 'Transfer failed'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" onClick={saving ? undefined : onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h3 className="font-bold text-gray-900 flex items-center gap-2">
+            <ArrowLeftRight className="w-5 h-5 text-violet-600" />
+            {t('transferOwnershipTitle')}
+          </h3>
+          <button onClick={onClose} disabled={saving} className="p-1 rounded-lg hover:bg-gray-100"><X className="w-5 h-5" /></button>
+        </div>
+
+        {done ? (
+          <div className="p-6 space-y-4 text-center">
+            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-50 flex items-center justify-center">
+              <Check className="w-8 h-8 text-emerald-600" />
+            </div>
+            <p className="font-bold text-gray-900">{t('transferDoneTitle')}</p>
+            <p className="text-sm text-gray-600 leading-relaxed">{t('transferDoneBody')}</p>
+            <button onClick={onClose} className="btn-primary w-full">{t('close')}</button>
+          </div>
+        ) : (
+          <div className="p-5 space-y-4">
+            {/* تحذير الحساسية */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs text-amber-800 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{t('transferWarning')}</span>
+            </div>
+
+            <div>
+              <label className="label">{t('transferNewOwner')} *</label>
+              <select className="input" value={targetUserId} onChange={e => setTargetUserId(e.target.value)}>
+                <option value="">{t('transferSelectUser')}</option>
+                {candidates.map(u => {
+                  const info = ROLE_INFO[u.role] || {}
+                  return (
+                    <option key={u.id} value={u.id}>{info.badge} {u.name} (@{u.username})</option>
+                  )
+                })}
+              </select>
+            </div>
+
+            <div>
+              <label className="label flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5" />
+                {t('transferCurrentPassword')} *
+              </label>
+              <input
+                type="password"
+                className="input"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              <p className="text-[11px] text-gray-500 mt-1">{t('transferPasswordHint')}</p>
+            </div>
+
+            <div className="border-t border-gray-100 pt-3 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-800 cursor-pointer">
+                <input type="checkbox" checked={keepAsSuper} onChange={e => setKeepAsSuper(e.target.checked)} className="w-4 h-4 accent-violet-600" />
+                {t('transferKeepMeSuper')}
+              </label>
+              {!keepAsSuper && (
+                <>
+                  <div>
+                    <label className="label">{t('transferMyNewRole')}</label>
+                    <select className="input" value={selfNewRole} onChange={e => setSelfNewRole(e.target.value)}>
+                      {selfRoles.map(r => <option key={r.key} value={r.key}>{r.badge} {r.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">{t('transferMyPharmacy')} *</label>
+                    <select className="input" value={selfPharmacyId} onChange={e => setSelfPharmacyId(e.target.value)}>
+                      {pharmaciesData.map(ph => (
+                        <option key={ph.id} value={ph.id}>{ph.logo} {pickName(ph)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {!serverStatus.online && (
+              <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg">{t('transferNeedsServer')}</p>
+            )}
+            {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{error}</p>}
+            <div className="flex gap-2 pt-2">
+              <button onClick={submit} disabled={saving || !serverStatus.online} className="btn-primary flex-1">
+                {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />}
+                {t('transferConfirmButton')}
+              </button>
+              <button onClick={onClose} disabled={saving} className="btn-secondary flex-1">{t('cancel')}</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const Platform = () => {
   const {
     t, isRTL, language, hasPermission, pharmaciesData, usersData, salesData,
@@ -210,8 +367,14 @@ const Platform = () => {
   const [tab, setTab] = useState('overview')
   const [showUserModal, setShowUserModal] = useState(null) // null | 'new' | user object
   const [showPharmacyModal, setShowPharmacyModal] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [actionError, setActionError] = useState('') // أخطاء عمليات الحذف/التعطيل من الخادم
+
+  const iAmSuperAdmin = currentUser?.role === 'super_admin'
+  // عدد المالكين النشطين — يحدد إمكانية تعديل/حذف سوبر أدمين آخر
+  const activeSuperAdmins = usersData.filter(u => u.role === 'super_admin' && u.active !== false).length
+  const superAdmins = usersData.filter(u => u.role === 'super_admin')
 
   // تحديث قائمة المستخدمين من الخادم عند فتح الصفحة (المصدر الموثوق: SQLite)
   // يعوّض مستخدمي العرض التجريبي بمستخدمي المنصة الحقيقيين.
@@ -355,6 +518,40 @@ const Platform = () => {
               </div>
             ))}
           </div>
+
+          {/* ملكية المنصة — عرض المالك الحالي ونقل الملكية (سوبر أدمين فقط) */}
+          {iAmSuperAdmin && (
+            <div className="card p-4 lg:p-6 border-violet-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white flex-shrink-0 shadow-lg shadow-violet-500/30">
+                    <Crown className="w-6 h-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+                      {t('platformOwnership')}
+                      <span className="badge bg-violet-100 text-violet-700">{superAdmins.length} 👑</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">
+                      {t('currentOwner')}: <b className="text-gray-700">{currentUser?.name}</b> (@{currentUser?.username})
+                      {superAdmins.length > 1 && <span className="ms-1">· {superAdmins.length - 1} {t('coOwnersCount')}</span>}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button onClick={() => setShowUserModal('new')} className="btn-secondary text-sm">
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('createSuperAdmin')}</span>
+                  </button>
+                  <button onClick={() => setShowTransferModal(true)} className="btn-primary text-sm">
+                    <ArrowLeftRight className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('transferOwnershipTitle')}</span>
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-3 leading-relaxed">{t('ownershipCardHint')}</p>
+            </div>
+          )}
 
           {/* Per-pharmacy breakdown */}
           <div className="card p-4 lg:p-6">
@@ -549,6 +746,10 @@ const Platform = () => {
                 {usersData.map(u => {
                   const ph = pharmaciesData.find(p => p.id === u.pharmacyId)
                   const info = ROLE_INFO[u.role] || {}
+                  // سوبر أدمين يدير سوبر أدمين آخر (لا نفسه ولا آخر مالك نشط)
+                  const canManage = u.role !== 'super_admin'
+                    ? u.id !== currentUser?.id
+                    : (iAmSuperAdmin && u.id !== currentUser?.id && activeSuperAdmins > 1)
                   return (
                     <tr key={u.id} className="hover:bg-gray-50">
                       <td className="py-3 px-2">
@@ -571,8 +772,8 @@ const Platform = () => {
                       <td className="py-3 px-2">
                         <button
                           onClick={() => handleToggleActive(u)}
-                          disabled={u.role === 'super_admin'}
-                          className={`badge ${u.active ? 'badge-success' : 'badge-gray'} ${u.role !== 'super_admin' ? 'cursor-pointer hover:opacity-80' : 'opacity-100'}`}
+                          disabled={!canManage}
+                          className={`badge ${u.active ? 'badge-success' : 'badge-gray'} ${canManage ? 'cursor-pointer hover:opacity-80' : 'opacity-100'}`}
                         >
                           {u.active ? t('active') : t('inactive')}
                         </button>
@@ -581,7 +782,7 @@ const Platform = () => {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => setShowUserModal(u)}
-                            disabled={u.role === 'super_admin'}
+                            disabled={!canManage}
                             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-40"
                             title={t('edit')}
                           >
@@ -589,7 +790,7 @@ const Platform = () => {
                           </button>
                           <button
                             onClick={() => handleDeleteUser(u)}
-                            disabled={u.role === 'super_admin'}
+                            disabled={!canManage}
                             className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 disabled:opacity-40"
                             title={t('delete')}
                           >
@@ -608,6 +809,9 @@ const Platform = () => {
             {usersData.map(u => {
               const ph = pharmaciesData.find(p => p.id === u.pharmacyId)
               const info = ROLE_INFO[u.role] || {}
+              const canManage = u.role !== 'super_admin'
+                ? u.id !== currentUser?.id
+                : (iAmSuperAdmin && u.id !== currentUser?.id && activeSuperAdmins > 1)
               return (
                 <div key={u.id} className="p-4 rounded-xl border border-gray-200 space-y-2">
                   <div className="flex items-center gap-3">
@@ -625,15 +829,15 @@ const Platform = () => {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleToggleActive(u)}
-                        disabled={u.role === 'super_admin'}
+                        disabled={!canManage}
                         className={`badge ${u.active ? 'badge-success' : 'badge-gray'}`}
                       >
                         {u.active ? t('active') : t('inactive')}
                       </button>
-                      <button onClick={() => setShowUserModal(u)} disabled={u.role === 'super_admin'} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-40"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => setShowUserModal(u)} disabled={!canManage} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-40"><Pencil className="w-4 h-4" /></button>
                       <button
                         onClick={() => handleDeleteUser(u)}
-                        disabled={u.role === 'super_admin'}
+                        disabled={!canManage}
                         className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 disabled:opacity-40"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -694,6 +898,9 @@ const Platform = () => {
           )}
         </div>
       )}
+
+      {/* نافذة نقل ملكية المنصة */}
+      {showTransferModal && <TransferOwnershipModal onClose={() => setShowTransferModal(false)} />}
     </div>
   )
 }

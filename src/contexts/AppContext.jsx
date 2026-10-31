@@ -5,7 +5,8 @@ import { moroccanDrugs } from '../data/moroccanDrugs'
 import { categories as moroccanCategories } from '../data/categories'
 import { roleHasPermission, ROLE_INFO } from '../config/permissions'
 import { api } from '../lib/api'
-import { directLink } from '../lib/directLink'
+import { realtime } from '../lib/realtime'
+import sounds from '../lib/sounds'
 
 // Load top drugs by default, full database on demand
 const TOP_DRUGS_COUNT = 200
@@ -217,6 +218,67 @@ export const AppProvider = ({ children }) => {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
+  // ===== جسر الاتصال الفوري: الطلبات الواردة من أجهزة أخرى (زبون ↔ موظفون) =====
+  // طلب جديد يصل من هاتف الزبون → يُستهلك مباشرة في هذه الجلسة (بلا تخزين
+  // خادمي)؛ وتحديثات الحالة تصل الزبون فورياً أينما كان. مع نغمة تنبيه.
+  useEffect(() => {
+    const off = realtime.onMessage((msg) => {
+      if (!msg) return
+
+      // طلب جديد/تحديث حالة (من خادم فوري أو احتياط BroadcastChannel)
+      if (msg.type === 'order' && msg.order) {
+        const incoming = msg.order
+        if (msg.action === 'update') {
+          setOrdersData((prev) => prev.map(o => (o.id === incoming.id ? { ...o, ...incoming, items: incoming.items || o.items } : o)))
+        } else {
+          // طلب جديد: تجاهل التكرار (قد يصل عبر القناتين) + تنبيه صوتي للموظفين
+          setOrdersData((prev) => (prev.some(o => o.id === incoming.id) ? prev : [incoming, ...prev].slice(0, 200)))
+          if (currentUser) {
+            sounds.message()
+            setNotifications((prev) => [{
+              id: Date.now(),
+              title: (language === 'ar' ? 'طلب جديد' : language === 'fr' ? 'Nouvelle commande' : 'New order'),
+              message: `${incoming.number || ''} · ${(incoming.customer?.name || '').slice(0, 40)}`,
+              time: new Date(),
+            }, ...prev].slice(0, 20))
+          }
+        }
+        return
+      }
+
+      // احتياط BroadcastChannel: أحداث الطلبات المحلية (نفس المتصفح)
+      if (msg.type === 'order_new' && msg.order) {
+        const incoming = msg.order
+        setOrdersData((prev) => (prev.some(o => o.id === incoming.id) ? prev : [incoming, ...prev].slice(0, 200)))
+        if (currentUser) {
+          sounds.message()
+          setNotifications((prev) => [{
+            id: Date.now(),
+            title: (language === 'ar' ? 'طلب جديد' : language === 'fr' ? 'Nouvelle commande' : 'New order'),
+            message: `${incoming.number || ''} · ${(incoming.customer?.name || '').slice(0, 40)}`,
+            time: new Date(),
+          }, ...prev].slice(0, 20))
+        }
+        return
+      }
+      if (msg.type === 'order_update' && msg.orderId) {
+        setOrdersData((prev) => prev.map(o => (o.id === msg.orderId ? { ...o, status: msg.status, ...(msg.order ? msg.order : {}) } : o)))
+      }
+    })
+    return off
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, language])
+
+  // مراقبة طلبات الزبون الحالية (استقبال تحديثاتها عبر الأجهزة)
+  useEffect(() => {
+    if (!currentCustomer) return
+    const myOrderIds = ordersData
+      .filter(o => o.customer?.phone === currentCustomer.phone)
+      .slice(0, 50)
+      .map(o => o.id)
+    if (myOrderIds.length > 0) realtime.watchOrders(myOrderIds)
+  }, [currentCustomer, ordersData])
+
   // الترجمة مع سلسلة احتياطية (اللغة → العربية → المفتاح)
   const t = (key) => translations[language]?.[key] || translations.ar?.[key] || key
   const isRTL = language === 'ar'
@@ -256,6 +318,13 @@ export const AppProvider = ({ children }) => {
       setCurrentPharmacy(pharmacy || pharmaciesData.find(p => p.id === user.pharmacyId) || null)
       setActivePharmacyId(pharmacy?.id || user.pharmacyId)
     }
+    // اتصال فوري (WebSocket) للتراسل والمكالمات عبر الأجهزة — بعد الدخول برمز JWT
+    try {
+      realtime.connect({
+        token: api.getAuthToken(),
+        userId: user.id, name: user.name, role: user.role,
+      })
+    } catch { /* الاتصال الفوري اختياري — احتياط BroadcastChannel محلي */ }
     const entry = {
       id: `audit-${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -275,6 +344,7 @@ export const AppProvider = ({ children }) => {
     }
     // مسح رمز جلسة الخادم (JWT) — لا يبقى أي أثر للجلسة
     api.logout()
+    realtime.disconnect()
     setCurrentUser(null)
     setCurrentPharmacy(null)
     setActivePharmacyId(null)
@@ -345,8 +415,10 @@ export const AppProvider = ({ children }) => {
   const deleteUser = async (id) => {
     if (!hasPermission('users.manage')) return
     const target = usersData.find(u => u.id === id)
-    // لا يمكن حذف السوبر أدمين أو الحساب الذاتي
-    if (!target || target.role === 'super_admin' || id === currentUser?.id) return
+    // لا يمكن حذف الحساب الذاتي — ولا آخر مالك منصة نشط
+    if (!target || id === currentUser?.id) return
+    const activeSuperAdmins = usersData.filter(u => u.role === 'super_admin' && u.active !== false).length
+    if (target.role === 'super_admin' && !(isSuperAdmin && activeSuperAdmins > 1)) return
     // الأدمن لا يمكنه حذف أدمن آخر أو محاسب؟ الأدمن يدير صيدليته فقط
     if (currentUser?.role === 'admin' && target.pharmacyId !== currentUser.pharmacyId) return
     if (serverStatus.online) {
@@ -358,6 +430,31 @@ export const AppProvider = ({ children }) => {
     }
     setUsersData((prev) => prev.filter(u => u.id !== id))
     logAudit('user_delete', { username: target.username, role: target.role })
+  }
+
+  // ===== نقل ملكية المنصة (سوبر أدمين فقط) =====
+  // يُنفَّذ على الخادم بعد تأكيد كلمة المرور، ثم تُحدَّث الحالة المحلية:
+  // المستهدف يصبح مالكاً (سوبر أدمين) ويُخفَّض المالك القديم إلى الدور المختار.
+  const transferOwnership = async ({ targetUserId, currentPassword, selfNewRole, selfPharmacyId }) => {
+    if (!isSuperAdmin) throw new Error('هذه العملية تتطلب صلاحية مالك المنصة')
+    const result = await api.transferOwnership({ targetUserId, currentPassword, selfNewRole, selfPharmacyId })
+    const target = usersData.find(u => u.id === targetUserId)
+    setUsersData((prev) => prev.map(u => {
+      if (u.id === targetUserId) return { ...u, role: 'super_admin', pharmacyId: null }
+      if (u.id === currentUser.id && selfNewRole && selfNewRole !== 'super_admin') {
+        return { ...u, role: selfNewRole, pharmacyId: selfPharmacyId || null }
+      }
+      return u
+    }))
+    // إذا خُفّض المالك القديم تُحدَّث جلسته فوراً (الخادم يعيد قراءة الدور من قاعدته)
+    if (result?.selfDemoted) {
+      setCurrentUser((prev) => prev ? { ...prev, role: selfNewRole, pharmacyId: selfPharmacyId || null } : prev)
+    }
+    logAudit('platform_ownership_transfer', {
+      newOwner: target?.username || targetUserId,
+      previousOwnerNewRole: selfNewRole || 'super_admin',
+    })
+    return result
   }
 
   // استبدال قائمة المستخدمين المحلية بمستخدمي الخادم الحقيقيين (بعد الدخول أو التحديث)
@@ -557,11 +654,17 @@ export const AppProvider = ({ children }) => {
 
   // =====================================================================
   // ===== الطلبات المباشرة (زبون ← صيدلية) =====
-  // الطلب يُبث مباشرة عبر قناة الاتصال (directLink) إلى نوافذ الموظفين،
-  // ويُحفظ محلياً في بيئة الصيدلية فقط (localStorage) — لا يُرسل إطلاقاً
-  // إلى خادم المنصة. الدردشة تبقى في الذاكرة المؤقتة وتُستهلك فورياً.
+  // الطلب يُبث فورياً عبر الاتصال الفوري إلى أجهزة موظفي الصيدلية
+  // (WebSocket عبر الأجهزة + احتياط BroadcastChannel محلياً)، ويُحفظ محلياً
+  // في بيئة كل طرف فقط (localStorage) — لا يُخزَّن إطلاقاً في خادم المنصة.
+  // الدردشة تبقى في الذاكرة المؤقتة وتُستهلك فورياً.
   // =====================================================================
-  const addOrder = (order) => {
+  const addOrder = (order, { silent = false } = {}) => {
+    // استيراد طلب ورد من جهاز آخر (له معرّف محدد) — بلا إعادة بث (منع الحلقات)
+    if (order.id && order.number) {
+      setOrdersData((prev) => (prev.some(o => o.id === order.id) ? prev : [order, ...prev].slice(0, 200)))
+      return order
+    }
     const newOrder = {
       ...order,
       id: `ord-${Date.now()}`,
@@ -573,8 +676,10 @@ export const AppProvider = ({ children }) => {
       assignedTo: null,
     }
     setOrdersData((prev) => [newOrder, ...prev].slice(0, 200))
-    // بث فوري إلى الموظفين المتصلين (اتصال مباشر — يُستهلك مباشرة)
-    directLink.announceOrder(newOrder)
+    if (!silent) {
+      // بث فوري لكل أجهزة الصيدلية — يُستهلك مباشرة بلا أي تخزين خادمي
+      realtime.announceOrder(newOrder)
+    }
     return newOrder
   }
 
@@ -585,7 +690,8 @@ export const AppProvider = ({ children }) => {
     const updated = { ...target, ...updates }
     setOrdersData(prev => prev.map(o => (o.id === id ? { ...o, ...updates } : o)))
     if (broadcast) {
-      directLink.announceOrderUpdate(id, updates.status || updated.status, { order: updated })
+      // بث لكل الأجهزة (الزبون + بقية الموظفين) — مباشر بلا تخزين
+      realtime.announceOrderUpdate(id, updated.status, { order: updated })
     }
     return updated
   }
@@ -636,7 +742,7 @@ export const AppProvider = ({ children }) => {
     // Auth & RBAC
     login, logout,
     hasPermission, isSuperAdmin, roleInfo,
-    usersData, visibleUsers, addUser, updateUser, deleteUser, importServerUsers, importServerPharmacies,
+    usersData, visibleUsers, addUser, updateUser, deleteUser, transferOwnership, importServerUsers, importServerPharmacies,
     pharmaciesData, addPharmacy, updatePharmacy,
     // أسماء متوافقة قديمة (تستعملها صفحة الدخول)
     users: usersData,

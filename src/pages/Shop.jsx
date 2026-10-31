@@ -8,6 +8,7 @@ import OrderTracking from '../components/OrderTracking'
 import SmartAvatar from '../components/SmartAvatar'
 import PlatformLogo, { PlatformWatermark } from '../components/PlatformLogo'
 import PublicFooter from '../components/PublicFooter'
+import { realtime } from '../lib/realtime'
 import {
   Store, MapPin, Phone, Search, ShoppingCart, Trash2, Plus, Minus,
   ArrowRight, ArrowLeft, PackageSearch, ClipboardList, LogOut, X, BadgeCheck,
@@ -56,6 +57,21 @@ const Shop = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
+
+  // ===== اتصال فوري كضيف (زبون) — دردشة/مكالمات/طلبات عبر الأجهزة =====
+  // يتصل بخادم المنصة الفوري بمجرد اختيار الصيدلية؛ الرسائل والمكالمات
+  // تُستهلك مباشرة ولا تُخزَّن، مع احتياط BroadcastChannel عند غياب الخادم.
+  useEffect(() => {
+    if (!pharmacyId) return
+    const fallbackName = language === 'ar' ? 'زبون' : language === 'fr' ? 'Client' : 'Customer'
+    realtime.connect({
+      guest: {
+        name: currentCustomer?.fullName || fallbackName,
+        phone: currentCustomer?.phone || '',
+        pharmacyId,
+      },
+    })
+  }, [pharmacyId, currentCustomer?.phone, currentCustomer?.fullName, language])
 
   const pharmacy = pharmaciesData.find(p => p.id === pharmacyId)
   const Arrow = isRTL ? ArrowLeft : ArrowRight
@@ -327,7 +343,7 @@ const Shop = () => {
               <button onClick={() => setMyOrdersOpen(true)}
                 className="relative p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors" aria-label={t('myOrders')}>
                 <ClipboardList className="w-5 h-5 text-gray-700" />
-                <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-[10px] font-bold w-4.5 h-4.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center">
                   {myOrders.length}
                 </span>
               </button>
@@ -355,7 +371,9 @@ const Shop = () => {
       </header>
 
       {/* ===== المحتوى ===== */}
-      <main className="max-w-6xl mx-auto p-4 pb-28 safe-bottom">
+      {/* w-full إلزامية: داخل حاوية flex-col يمنع mx-auto التمدد فيتحول
+          العرض إلى «حسب المحتوى» فيفيض شريط الفئات خارج الشاشة (خلل الفيض) */}
+      <main className="w-full max-w-6xl mx-auto p-4 pb-28 safe-bottom">
         {step === 'pharmacies' && renderPharmacies()}
         {step === 'browse' && renderBrowse()}
         {step === 'tracking' && renderTracking()}

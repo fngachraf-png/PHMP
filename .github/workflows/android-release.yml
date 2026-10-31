@@ -116,12 +116,74 @@ jobs:
           echo "--- MainActivity (immersive) ---"
           grep -c "enableImmersiveMode" android/app/src/main/java/com/phmp/pharmacare/MainActivity.java
 
-      - name: 🎨 نسخ الأيقونات المخصصة
+      - name: 🎨 نسخ الأيقونات المخصصة (كاملة: raster + adaptive + splash)
         run: |
+          # 1) أيقونات raster (أندرويد < 8)
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             cp android-resources/icons/mipmap-${density}/ic_launcher.png android/app/src/main/res/mipmap-${density}/ic_launcher.png
             cp android-resources/icons/mipmap-${density}/ic_launcher.png android/app/src/main/res/mipmap-${density}/ic_launcher_round.png
           done
+
+          # 2) الطبقة الأمامية للأيقونة التكيفية (أندرويد 8+ — السبب الجذري
+          #    لعرض أيقونة كاباسيتور: mipmap-anydpi-v26 يشير إلى
+          #    ic_launcher_foreground ولم يكن يُستبدَل)
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp android-resources/icons/mipmap-${density}/ic_launcher_foreground.png android/app/src/main/res/mipmap-${density}/ic_launcher_foreground.png
+          done
+
+          # 3) الطبقة الخلفية: لون أبيض (بدل شبكة كاباسيتور الفيكتورية)
+          cat > android/app/src/main/res/values/ic_launcher_background.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="ic_launcher_background">#FFFFFF</color>
+          </resources>
+          XML
+          # إزالة خلفية كاباسيتور الفيكتورية غير المستعملة واستبدالها بمستطيل أبيض
+          cat > android/app/src/main/res/drawable/ic_launcher_background.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#FFFFFF" android:pathData="M0,0h108v108h-108z" />
+          </vector>
+          XML
+
+          # 4) ضمان ملفات anydpi-v26 (تشير إلى مواردنا)
+          mkdir -p android/app/src/main/res/mipmap-anydpi-v26
+          cat > android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_launcher_background"/>
+              <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+          </adaptive-icon>
+          XML
+          cp android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+
+          # 5) شاشة البداية بلوغو المنصة (بدل شاشة كاباسيتور) — كل الكثافات
+          for folder in drawable drawable-land-mdpi drawable-land-hdpi drawable-land-xhdpi drawable-land-xxhdpi drawable-land-xxxhdpi drawable-port-mdpi drawable-port-hdpi drawable-port-xhdpi drawable-port-xxhdpi drawable-port-xxxhdpi; do
+            mkdir -p android/app/src/main/res/${folder}
+            cp android-resources/splash/${folder}/splash.png android/app/src/main/res/${folder}/splash.png
+          done
+
+          echo "--- التحقق: أيقونات وحجم الطبقة الأمامية ---"
+          ls -la android/app/src/main/res/mipmap-xxxhdpi/ | grep ic_launcher
+          file android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+
+      - name: 🔐 صلاحيات الكاميرا والمايكروفون والموقع الجغرافي (تطبيق أندرويد)
+        run: |
+          # حقن صلاحيات المنصة في AndroidManifest — مطلوبة للمكالمات الصوتية/
+          # المرئية (WebRTC) ومشاركة الموقع الجغرافي داخل التطبيق
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          AFTER='android.permission.INTERNET'
+          # الصلاحيات الثلاث المطلوبة + إعدادات الصوت + الموقع (دقيق + تقريبي)
+          for PERM in "android.permission.CAMERA" "android.permission.RECORD_AUDIO" "android.permission.MODIFY_AUDIO_SETTINGS" "android.permission.ACCESS_FINE_LOCATION" "android.permission.ACCESS_COARSE_LOCATION"; do
+            grep -q "android:name=\"$PERM\"" "$MANIFEST" || sed -i "s|<uses-permission android:name=\"$AFTER\" />|<uses-permission android:name=\"$AFTER\" />\n    <uses-permission android:name=\"$PERM\" />|" "$MANIFEST"
+          done
+          # uses-feature اختيارية: التطبيق يُثبَّت على كل الأجهزة حتى بلا كاميرا/موقع
+          grep -q "android.hardware.camera" "$MANIFEST" || sed -i 's|</manifest>|    <uses-feature android:name="android.hardware.camera" android:required="false" />\n    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />\n    <uses-feature android:name="android.hardware.location" android:required="false" />\n    <uses-feature android:name="android.hardware.microphone" android:required="false" />\n</manifest>|' "$MANIFEST"
+
+          echo "--- AndroidManifest (الصلاحيات) ---"
+          grep "uses-permission\|uses-feature" "$MANIFEST"
 
       - name: 🔐 فك شهادة التوقيع
         run: |

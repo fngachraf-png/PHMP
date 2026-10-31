@@ -11,6 +11,7 @@ import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
 import SmartAvatar, { isImage } from './SmartAvatar'
 import PlatformLogo, { PlatformWatermark } from './PlatformLogo'
+import StaffComms from './calls/StaffComms'
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { t, isRTL, currentPharmacy, currentUser, logout, language, hasPermission, isSuperAdmin, activePharmacyId, switchPharmacy, pharmaciesData, serverStatus, visibleOrders, pickName } = useApp()
@@ -282,6 +283,9 @@ const Header = ({ onMenuClick }) => {
 
           {/* Theme toggle — الوضع الفاتح/الداكن */}
           <ThemeToggle variant="icon" />
+
+          {/* لوحة التواصل الداخلي — دردشة ومكالمات مع الزملاء (كاشير ↔ موظفون) */}
+          <StaffComms />
 
           {/* Notifications */}
           <div className="relative">

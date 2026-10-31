@@ -317,6 +317,7 @@ const LiveOrders = () => {
                   who={currentUser.name}
                   role={currentUser.role}
                   counterpartLabel={selected.customer?.name}
+                  pharmacyId={selected.pharmacyId}
                 />
                 <p className="text-[11px] text-center text-gray-400 leading-relaxed">{t('chatPrivateNote')}</p>
               </div>

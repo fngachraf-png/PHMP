@@ -15,6 +15,7 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { randomUUID, timingSafeEqual } from 'crypto'
 import { db, initSchema, setMeta, getMeta, DB_PATH } from './db.js'
+import { setupRealtime } from './realtime.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -90,7 +91,10 @@ app.use((_req, res, next) => {
   res.set('X-Content-Type-Options', 'nosniff')
   res.set('Referrer-Policy', 'no-referrer')
   res.set('X-Frame-Options', 'DENY')
-  res.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+  // صلاحيات المنصة: الكاميرا والمايكروفون (المكالمات الصوتية/المرئية WebRTC)
+  // والموقع الجغرافي (التوصيل ومشاركة الموقع) مسموحة لنفس الأصل — كان الحجب
+  // الكامل السابق يمنع هذه الميزات في التطبيق والمنصة.
+  res.set('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(self)')
   next()
 })
 
@@ -148,17 +152,26 @@ setInterval(() => {
 }, 10 * 60 * 1000).unref()
 
 // ===== المصادقة =====
+// بعد التحقق من التوقيع يُعاد قراءة الدور والحالة من قاعدة البيانات:
+// أي ترقية/تخفيض/توقيف يسري فوراً حتى قبل انتهاء صلاحية الرمز (12 ساعة).
 const authenticate = (req, res, next) => {
   const header = req.headers.authorization || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
   if (!token) return res.status(401).json({ error: 'مطلوب تسجيل الدخول' })
   try {
-    req.user = jwt.verify(token, JWT_SECRET)
+    const payload = jwt.verify(token, JWT_SECRET)
+    const fresh = db.prepare('SELECT role, active, pharmacy_id FROM users WHERE id = ?').get(payload.id)
+    if (!fresh || !fresh.active) return res.status(401).json({ error: 'الحساب موقوف أو محذوف — سجّل الدخول من جديد' })
+    req.user = { ...payload, role: fresh.role, pharmacyId: fresh.pharmacy_id }
     next()
   } catch {
     res.status(401).json({ error: 'جلسة غير صالحة' })
   }
 }
+
+// عدد السوبر أدمين النشطين — حماية من فقدان ملكية المنصة نهائياً
+const countActiveSuperAdmins = () =>
+  db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'super_admin' AND active = 1").get().n
 
 // فحص الصلاحيات حسب الدور
 const requireRole = (...roles) => (req, res, next) => {
@@ -295,6 +308,15 @@ app.patch('/api/users/:id', authenticate, requireRole('super_admin', 'admin'), (
   if (req.user.role === 'admin' && pharmacyId !== undefined && pharmacyId !== req.user.pharmacyId) {
     return res.status(403).json({ error: 'لا يمكنك نقل مستخدم إلى صيدلية أخرى' })
   }
+  // حماية ملكية المنصة: لا يُخفَّض آخر سوبر أدمين نشط ولا يُوقف
+  const isDemotingSuper = target.role === 'super_admin' && role !== undefined && role !== 'super_admin'
+  if (isDemotingSuper && countActiveSuperAdmins() <= 1) {
+    return res.status(403).json({ error: 'لا يمكن تخفيض آخر مالك منصة نشط — أنشئ أو رقِّ مالكاً آخر أولاً' })
+  }
+  const isDeactivatingSuper = target.role === 'super_admin' && active === false
+  if (isDeactivatingSuper && countActiveSuperAdmins() <= 1) {
+    return res.status(403).json({ error: 'لا يمكن إيقاف آخر مالك منصة نشط — أنشئ أو رقِّ مالكاً آخر أولاً' })
+  }
   const updates = {}
   if (name !== undefined) { updates.name = name; db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, target.id) }
   // صورة المستخدم (dataURL مضغوط) أو رمز تعبيري — تُخزن في نفس الحقل
@@ -302,9 +324,18 @@ app.patch('/api/users/:id', authenticate, requireRole('super_admin', 'admin'), (
     updates.avatar = avatar
     db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(avatar, target.id)
   }
-  if (role !== undefined && target.role !== 'super_admin') { updates.role = role; db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, target.id) }
+  // سوبر أدمين يمكنه تعديل دور سوبر أدمين آخر (أو تخفيضه بشرط بقاء مالك نشط)
+  if (role !== undefined && (target.role !== 'super_admin' || req.user.role === 'super_admin')) {
+    updates.role = role
+    db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, target.id)
+    // الترقية إلى سوبر أدمين تجعل نطاقه كل الصيدليات
+    if (role === 'super_admin') db.prepare('UPDATE users SET pharmacy_id = NULL WHERE id = ?').run(target.id)
+  }
   if (pharmacyId !== undefined) { updates.pharmacy_id = pharmacyId; db.prepare('UPDATE users SET pharmacy_id = ? WHERE id = ?').run(pharmacyId, target.id) }
-  if (active !== undefined && target.role !== 'super_admin') { updates.active = active ? 1 : 0; db.prepare('UPDATE users SET active = ? WHERE id = ?').run(updates.active, target.id) }
+  if (active !== undefined && (target.role !== 'super_admin' || req.user.role === 'super_admin')) {
+    updates.active = active ? 1 : 0
+    db.prepare('UPDATE users SET active = ? WHERE id = ?').run(updates.active, target.id)
+  }
   if (password) { db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(password, 10), target.id) }
   audit(req, 'user.update', { targetId: target.id, fields: Object.keys(updates), passwordChanged: !!password }, req.user)
   res.json({ ok: true, updates: Object.keys(updates) })
@@ -313,14 +344,68 @@ app.patch('/api/users/:id', authenticate, requireRole('super_admin', 'admin'), (
 app.delete('/api/users/:id', authenticate, requireRole('super_admin', 'admin'), (req, res) => {
   const target = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id)
   if (!target) return res.status(404).json({ error: 'المستخدم غير موجود' })
-  if (target.role === 'super_admin') return res.status(403).json({ error: 'لا يمكن حذف مالك المنصة' })
   if (target.id === req.user.id) return res.status(403).json({ error: 'لا يمكنك حذف حسابك' })
+  // سوبر أدمين يمكنه حذف سوبر أدمين آخر — إلا آخر مالك نشط
+  if (target.role === 'super_admin') {
+    if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'لا يمكن حذف مالك المنصة' })
+    if (countActiveSuperAdmins() <= 1) {
+      return res.status(403).json({ error: 'لا يمكن حذف آخر مالك منصة نشط — أنشئ أو رقِّ مالكاً آخر أولاً' })
+    }
+  }
   if (req.user.role === 'admin' && target.pharmacy_id !== req.user.pharmacyId) {
     return res.status(403).json({ error: 'لا يمكنك حذف مستخدم من صيدلية أخرى' })
   }
   db.prepare('DELETE FROM users WHERE id = ?').run(target.id)
   audit(req, 'user.delete', { targetId: target.id, username: target.username }, req.user)
   res.json({ ok: true })
+})
+
+// ===== نقل ملكية المنصة (سوبر أدمين فقط) =====
+// عملية حساسة وموثّقة: يُطلب من المالك الحالي تأكيد كلمة مروره، ويُرقّى
+// المستهدف إلى سوبر أدمين، ويُخفَّض المالك القديم إلى الدور الذي يختاره
+// (أو يبقى سوبر أدمين مشاركاً إن لم يُحدد دوراً جديداً).
+app.post('/api/platform/transfer-ownership', authenticate, requireRole('super_admin'), (req, res) => {
+  try {
+    const { targetUserId, currentPassword, selfNewRole, selfPharmacyId } = req.body || {}
+    if (!targetUserId || !currentPassword) {
+      return res.status(400).json({ error: 'المستخدم المستهدف وكلمة المرور الحالية إلزاميان' })
+    }
+    const me = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
+    if (!me || !bcrypt.compareSync(String(currentPassword), me.password_hash)) {
+      audit(req, 'platform.ownership.transfer.denied', { targetUserId }, req.user)
+      return res.status(401).json({ error: 'كلمة المرور الحالية غير صحيحة' })
+    }
+    const target = db.prepare('SELECT * FROM users WHERE id = ?').get(targetUserId)
+    if (!target) return res.status(404).json({ error: 'المستخدم المستهدف غير موجود' })
+    if (target.id === me.id) return res.status(400).json({ error: 'لا يمكنك نقل الملكية إلى نفسك' })
+    if (!target.active) return res.status(400).json({ error: 'المستخدم المستهدف موقوف — فعّله أولاً' })
+
+    // 1) ترقية المستهدف إلى مالك منصة (نطاق كل الصيدليات)
+    db.prepare("UPDATE users SET role = 'super_admin', pharmacy_id = NULL WHERE id = ?").run(target.id)
+    setMeta('platform_owner', target.id)
+    setMeta('platform_owner_transferred_at', new Date().toISOString())
+
+    // 2) دور المالك القديم: تخفيض إلى الدور المختار أو البقاء مالكاً مشاركاً
+    let selfDemoted = false
+    if (selfNewRole && selfNewRole !== 'super_admin') {
+      if (!VALID_ROLES.includes(selfNewRole)) return res.status(400).json({ error: 'دور غير صالح' })
+      if (selfNewRole !== 'super_admin' && !selfPharmacyId) {
+        return res.status(400).json({ error: 'اختر الصيدلية التي ستنضم إليها بعد نقل الملكية' })
+      }
+      db.prepare('UPDATE users SET role = ?, pharmacy_id = ? WHERE id = ?').run(selfNewRole, selfPharmacyId || null, me.id)
+      selfDemoted = true
+    }
+
+    audit(req, 'platform.ownership.transfer', {
+      newOwnerId: target.id,
+      newOwnerUsername: target.username,
+      previousOwnerUsername: me.username,
+      previousOwnerNewRole: selfNewRole || 'super_admin',
+    }, req.user)
+    res.json({ ok: true, selfDemoted, newOwner: { id: target.id, username: target.username, name: target.name } })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // ===== الصيدليات =====
@@ -542,6 +627,14 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`   محلياً:   http://${HOST}:${PORT}`)
   console.log(`   قاعدة البيانات: ${DB_PATH}`)
   console.log('   بانتظار تشغيل النفق الدائم (راجع tunnel/start-tunnel.sh)')
+})
+
+// ===== خادم الاتصال الفوري (WebSocket) — التراسل والمكالمات بلا تخزين =====
+// المكالمات الصوتية/المرئية تُستهلك مباشرة بين المستخدمين (WebRTC ندّ لند)؛
+// هذا الخادم يرحّل الرسائل وإشارات الاتصال في الذاكرة فقط (قاعدة 8 — WORKLOG).
+setupRealtime(server, {
+  verifyJwt: (token) => jwt.verify(token, JWT_SECRET),
+  log: (m) => console.log(m),
 })
 
 // إغلاق نظيف (يحافظ على سلامة WAL)

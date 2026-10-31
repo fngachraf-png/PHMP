@@ -513,4 +513,62 @@ export const en = {
   officialCatalogPicker: 'Quick add from the official list',
   officialCatalogSearchHint: 'Search by brand name, DCI or barcode (e.g. doliprane, AUGMENTIN, 61117…)',
   officialCatalogNote: 'Official Moroccan list unified with the CNSS reimbursable medicines list; click a result to auto-fill the form with official names and prices.',
+
+  // ===== Platform owner: ownership transfer & super-admin creation =====
+  superAdminRoleNote: 'The platform owner holds all permissions across every pharmacy — create it only for someone you fully trust',
+  platformOwnership: 'Platform Ownership',
+  currentOwner: 'Current owner',
+  coOwnersCount: 'co-owner(s)',
+  createSuperAdmin: 'Create Super Admin',
+  ownershipCardHint: 'Transferring ownership grants the new owner full platform permissions (with your password confirmation); you may stay as a co-owner or pick your new role afterwards. The action is recorded in the audit log, and the last active owner can never be deleted or demoted.',
+  transferOwnershipTitle: 'Transfer Platform Ownership',
+  transferNewOwner: 'New owner',
+  transferSelectUser: 'Select a user…',
+  transferCurrentPassword: 'Current password',
+  transferPasswordHint: 'Mandatory confirmation — your current password is required for this sensitive operation',
+  transferKeepMeSuper: 'Stay as co-owner after the transfer',
+  transferMyNewRole: 'My new role after the transfer',
+  transferMyPharmacy: 'My pharmacy after the transfer',
+  transferNeedsServer: 'This operation requires the platform server — make sure it is running',
+  transferConfirmButton: 'Transfer Ownership Now',
+  transferWarning: 'Sensitive operation: the selected user will become the full platform owner. Double-check your choice.',
+  transferPickTarget: 'Pick the new owner first',
+  transferEnterPassword: 'Enter your current password to confirm',
+  transferPickPharmacy: 'Pick the pharmacy you will join after the transfer',
+  transferDoneTitle: 'Ownership transferred successfully',
+  transferDoneBody: 'The new owner now holds all platform permissions. The action is recorded in the audit log and the new roles apply immediately.',
+
+  // ===== Audio & video calls (direct connection between users) =====
+  callAudio: 'Audio call',
+  callVideo: 'Video call',
+  callIncoming: 'Incoming call…',
+  callRinging: 'Calling…',
+  callConnecting: 'Connecting…',
+  callEnded: 'Call ended',
+  callBusy: 'Line busy with another call',
+  callFailed: 'Could not establish the call',
+  callMicBlocked: 'Camera/microphone access required — enable the permission in your browser or app settings, then try again',
+  callAccept: 'Answer',
+  callReject: 'Decline',
+  callEnd: 'End call',
+  callMute: 'Mute microphone',
+  callCamera: 'Toggle camera',
+  callPrivateNote: 'Direct connection between users — the call never passes through any server',
+
+  // ===== Real-time chat synced across devices =====
+  chatLiveSync: 'Live',
+  chatLocalOnly: 'Local',
+  chatViaServer: 'Live sync across devices (realtime server)',
+  shareLocation: 'Share my current location',
+
+  // ===== Internal communications (cashier ↔ staff) =====
+  staffComms: 'Contact Colleagues',
+  commsLive: 'Live across devices',
+  commsLocal: 'Local (same browser)',
+  searchColleague: 'Search a colleague…',
+  noColleagues: 'No colleagues to show',
+
+  // ===== Geolocation (delivery) =====
+  useMyLocation: 'Use my current location (GPS)',
+  locating: 'Locating…',
 }

@@ -513,4 +513,62 @@ export const fr = {
   officialCatalogPicker: 'Ajout rapide depuis la liste officielle',
   officialCatalogSearchHint: 'Rechercher par nom commercial, DCI ou code-barres (ex. : doliprane, AUGMENTIN, 61117…)',
   officialCatalogNote: 'Liste officielle marocaine unifiée avec la liste CNSS des médicaments remboursables ; cliquez sur un résultat pour remplir le formulaire automatiquement.',
+
+  // ===== Propriétaire de la plateforme : transfert et création de super-admin =====
+  superAdminRoleNote: 'Le propriétaire détient tous les droits sur toutes les pharmacies — ne le créer que pour une personne de confiance absolue',
+  platformOwnership: 'Propriété de la plateforme',
+  currentOwner: 'Propriétaire actuel',
+  coOwnersCount: 'copropriétaire(s)',
+  createSuperAdmin: 'Créer un super-admin',
+  ownershipCardHint: 'Le transfert accorde au nouveau propriétaire toutes les permissions (avec confirmation de votre mot de passe) ; vous pouvez rester copropriétaire ou choisir votre nouveau rôle. L\'opération est consignée dans le journal d\'audit et le dernier propriétaire actif ne peut être ni supprimé ni rétrogradé.',
+  transferOwnershipTitle: 'Transférer la propriété',
+  transferNewOwner: 'Nouveau propriétaire',
+  transferSelectUser: 'Choisir un utilisateur…',
+  transferCurrentPassword: 'Mot de passe actuel',
+  transferPasswordHint: 'Confirmation obligatoire — votre mot de passe actuel est requis pour cette opération sensible',
+  transferKeepMeSuper: 'Rester copropriétaire après le transfert',
+  transferMyNewRole: 'Mon nouveau rôle après le transfert',
+  transferMyPharmacy: 'Pharmacy de rattachement',
+  transferNeedsServer: 'Cette opération nécessite une connexion au serveur — vérifiez que le serveur de la plateforme est démarré',
+  transferConfirmButton: 'Transférer maintenant',
+  transferWarning: 'Opération sensible : l\'utilisateur choisi deviendra propriétaire complet de la plateforme. Vérifiez votre choix.',
+  transferPickTarget: 'Choisissez d\'abord le nouveau propriétaire',
+  transferEnterPassword: 'Saisissez votre mot de passe actuel pour confirmer',
+  transferPickPharmacy: 'Choisissez la pharmacie de rattachement après le transfert',
+  transferDoneTitle: 'Transfert réussi',
+  transferDoneBody: 'Le nouveau propriétaire détient désormais toutes les permissions. L\'opération est consignée dans le journal d\'audit et les nouveaux droits s\'appliquent immédiatement.',
+
+  // ===== Appels audio/vidéo (connexion directe entre utilisateurs) =====
+  callAudio: 'Appel audio',
+  callVideo: 'Appel vidéo',
+  callIncoming: 'Appel entrant…',
+  callRinging: 'Appel en cours…',
+  callConnecting: 'Connexion…',
+  callEnded: 'Appel terminé',
+  callBusy: 'Ligne occupée par un autre appel',
+  callFailed: 'Impossible d\'établir l\'appel',
+  callMicBlocked: 'Accès caméra/micro requis — autorisez la permission dans les paramètres du navigateur ou de l\'application puis réessayez',
+  callAccept: 'Répondre',
+  callReject: 'Refuser',
+  callEnd: 'Terminer l\'appel',
+  callMute: 'Couper le micro',
+  callCamera: 'Activer/désactiver la caméra',
+  callPrivateNote: 'Connexion directe entre utilisateurs — l\'appel ne transite par aucun serveur',
+
+  // ===== Chat instantané synchronisé entre appareils =====
+  chatLiveSync: 'Direct',
+  chatLocalOnly: 'Local',
+  chatViaServer: 'Synchronisation directe entre appareils (serveur temps réel)',
+  shareLocation: 'Partager ma position',
+
+  // ===== Communication interne (caissier ↔ personnel) =====
+  staffComms: 'Contacter les collègues',
+  commsLive: 'Direct entre appareils',
+  commsLocal: 'Local (même navigateur)',
+  searchColleague: 'Rechercher un collègue…',
+  noColleagues: 'Aucun collègue à afficher',
+
+  // ===== Géolocalisation (livraison) =====
+  useMyLocation: 'Utiliser ma position actuelle (GPS)',
+  locating: 'Localisation en cours…',
 }

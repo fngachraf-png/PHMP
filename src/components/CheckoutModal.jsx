@@ -3,7 +3,7 @@ import { useApp } from '../contexts/AppContext'
 import PhotoUpload from './PhotoUpload'
 import {
   X, UserRound, UserRoundCheck, Stethoscope, Truck, Store, Bike, PackageCheck,
-  ArrowRight, ArrowLeft, ShieldCheck, Info, BadgeCheck
+  ArrowRight, ArrowLeft, ShieldCheck, Info, BadgeCheck, MapPin
 } from 'lucide-react'
 
 // =====================================================================
@@ -30,6 +30,23 @@ const CheckoutModal = ({ open, onClose, cart, subtotal, hasRxItems, pharmacy, on
   // التوصيل
   const [deliveryMethod, setDeliveryMethod] = useState('pickup')
   const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [locating, setLocating] = useState(false)
+
+  // ===== مشاركة الموقع الجغرافي — إحداثيات دقيقة تُرفق مع عنوان التوصيل =====
+  const useMyLocation = () => {
+    if (!navigator.geolocation) return
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false)
+        const { latitude, longitude } = pos.coords
+        const coords = `📍 ${latitude.toFixed(5)}, ${longitude.toFixed(5)} — https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`
+        setDeliveryAddress((prev) => prev.trim() ? `${prev.trim()}\n${coords}` : coords)
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 8000 },
+    )
+  }
 
   const [step, setStep] = useState(1) // 1: هوية 2: وصفة 3: توصيل 4: تأكيد
   const [placing, setPlacing] = useState(false)
@@ -297,6 +314,16 @@ const CheckoutModal = ({ open, onClose, cart, subtotal, hasRxItems, pharmacy, on
                   <label className="label">{t('address')}</label>
                   <textarea value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)}
                     className="input min-h-[70px]" rows={2} />
+                  {/* مشاركة الموقع الجغرافي — يرفق إحداثيات دقيقة لتوصيل أسرع */}
+                  <button
+                    type="button"
+                    onClick={useMyLocation}
+                    disabled={locating}
+                    className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 rounded-lg px-3 py-2 transition-colors disabled:opacity-60"
+                  >
+                    <MapPin className={`w-3.5 h-3.5 ${locating ? 'animate-pulse' : ''}`} />
+                    {locating ? t('locating') : t('useMyLocation')}
+                  </button>
                 </div>
               )}
 

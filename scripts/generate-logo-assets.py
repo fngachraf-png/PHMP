@@ -114,6 +114,29 @@ def save(im, path):
     im.save(path)
     print(f'  ✓ {os.path.relpath(path, REPO)}  ({im.width}x{im.height}, {os.path.getsize(path)//1024}KB)')
 
+def adaptive_foreground(im, size):
+    """طبقة أمامية للأيقونة التكيفية (Android 8+):
+    قماشة 108dp والمنطقة الآمنة دائرة قطرها 66dp (≈61%) —
+    اللوغو شفاف الخلفية مشغّل ~53% من القماشة (الطبقة الخلفية بيضاء)
+    كي لا تُقتطع أي تفصيلة في أصغر أقنعة المشغّلات (تم التحقق هندسياً)."""
+    side = int(size * 0.53)
+    logo = im.copy()
+    logo.thumbnail((side, side), Image.LANCZOS)
+    canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    canvas.paste(logo, ((size - logo.width) // 2, (size - logo.height) // 2), logo)
+    return canvas
+
+def splash_image(im, width, height, logo_ratio=0.30):
+    """شاشة البداية: لوغو المنصة على خلفية بيضاء (CENTER_CROP آمن —
+    حجم اللوغو نسبة من الضلع الأقصر كي لا يُقتطع في أي اتجاه)."""
+    short_side = min(width, height)
+    side = int(short_side * logo_ratio)
+    logo = im.copy()
+    logo.thumbnail((side, side), Image.LANCZOS)
+    canvas = Image.new('RGB', (width, height), (255, 255, 255))
+    canvas.paste(logo, ((width - logo.width) // 2, (height - logo.height) // 2), logo)
+    return canvas
+
 def main():
     print('— تحميل الملفين وفصل الخلفية الشبكية —')
     dark = content_bbox(remove_checkerboard(Image.open(DARK_SRC)))
@@ -151,6 +174,25 @@ def main():
     for dpi, size in (('mdpi',48),('hdpi',72),('xhdpi',96),('xxhdpi',144),('xxxhdpi',192)):
         save(on_background(light, size, scale=0.86), A('icons', f'mipmap-{dpi}', 'ic_launcher.png'))
     save(on_background(light, 512, scale=0.86), A('icons', 'icon-512', 'ic_launcher.png'))
+
+    print('— الأيقونة التكيفية Android 8+ (الطبقة الأمامية — إصلاح أيقونة كاباسيتور) —')
+    # قماشة 108dp: mdpi=108px … xxxhdpi=432px — المنطقة الآمنة 66dp (61%)
+    for dpi, size in (('mdpi',108),('hdpi',162),('xhdpi',216),('xxhdpi',324),('xxxhdpi',432)):
+        save(adaptive_foreground(light, size), A('icons', f'mipmap-{dpi}', 'ic_launcher_foreground.png'))
+    save(adaptive_foreground(light, 432), A('icons', 'ic_launcher_foreground-432.png'))
+
+    print('— شاشة البداية بشعار المنصة (كل الكثافات عمودي/أفقي) —')
+    SPLASHES = {
+        'drawable': (480, 320),
+        'drawable-land-mdpi': (480, 320), 'drawable-land-hdpi': (800, 480),
+        'drawable-land-xhdpi': (1280, 720), 'drawable-land-xxhdpi': (1600, 960),
+        'drawable-land-xxxhdpi': (1920, 1280),
+        'drawable-port-mdpi': (320, 480), 'drawable-port-hdpi': (480, 800),
+        'drawable-port-xhdpi': (720, 1280), 'drawable-port-xxhdpi': (960, 1600),
+        'drawable-port-xxxhdpi': (1280, 1920),
+    }
+    for folder, (w, h) in SPLASHES.items():
+        save(splash_image(light, w, h), A('splash', folder, 'splash.png'))
     print('— اكتمل توليد الأصول —')
 
 if __name__ == '__main__':
