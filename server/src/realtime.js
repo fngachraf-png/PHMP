@@ -315,6 +315,24 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
     ws.on('error', () => { clearTimeout(authTimer); cleanupConn(ws) })
   })
 
+  // ===== بث من الخادم مباشرة (وليس ترحيل عميل) =====
+  // يُستعمل بعد حفظ الطلب في SQLite: يصل فورياً لكل موظفي صيدلية الطلب
+  // المتصلين + أعضاء غرفة الطلب (الزبون المراقب) — مهما كانت واجهتهم
+  // (Pages/Vercel/أندرويد) لأن الجميع متصل بنفس الخادم الفوري الموحد.
+  const broadcastOrder = (order, action = 'new') => {
+    if (!order || typeof order !== 'object' || !order.id) return
+    const targets = new Set()
+    if (order.pharmacyId) {
+      eachConn(byPharmacy.get(order.pharmacyId) || [], (_m, mid) => targets.add(mid))
+    }
+    for (const cid of rooms.get(`order:${String(order.id).slice(0, 80)}`) || []) targets.add(cid)
+    const envelope = {
+      type: 'order', action: action === 'update' ? 'update' : 'new',
+      order, from: 'server', fromKind: 'server', ts: Date.now(),
+    }
+    eachConn(targets, (m) => sendTo(m.ws, envelope))
+  }
+
   // نبض دوري: إسقاط الاتصالات الميتة
   const heartbeat = setInterval(() => {
     for (const [id, meta] of conns) {
@@ -327,6 +345,6 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
   }, HEARTBEAT_MS)
   heartbeat.unref()
 
-  log('🟢 خادم الاتصال الفوري جاهز على /ws (بلا تخزين — استهلاك مباشر)')
-  return { wss, conns }
+  log('🟢 خادم الاتصال الفوري جاهز على /ws (الرسائل والمكالمات بلا تخزين)')
+  return { wss, conns, broadcastOrder }
 }

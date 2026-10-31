@@ -32,8 +32,17 @@ const Shop = () => {
     ordersData, categories,
   } = useApp()
 
-  const [step, setStep] = useState('pharmacies') // pharmacies | browse | tracking
-  const [pharmacyId, setPharmacyId] = useState(null)
+  // حفظ اختيار الصيدلية (إصلاح v2.1.0): كان الاختيار يضيع عند أي إعادة تحميل
+  // فيفقد الزبون الاتصال الفوري ويتوجب اختيار الصيدلية من جديد كل مرة.
+  const SHOP_PHARMACY_KEY = 'pharmacare_shop_pharmacy'
+  const loadSavedPharmacy = () => {
+    try {
+      const v = JSON.parse(localStorage.getItem(SHOP_PHARMACY_KEY) || 'null')
+      return typeof v === 'string' && v ? v : null
+    } catch { return null }
+  }
+  const [step, setStep] = useState(() => (loadSavedPharmacy() ? 'browse' : 'pharmacies')) // pharmacies | browse | tracking
+  const [pharmacyId, setPharmacyId] = useState(() => loadSavedPharmacy())
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [cart, setCart] = useState([])
@@ -59,9 +68,10 @@ const Shop = () => {
   }, [searchParams])
 
   // ===== اتصال فوري كضيف (زبون) — دردشة/مكالمات/طلبات عبر الأجهزة =====
-  // يتصل بخادم المنصة الفوري بمجرد اختيار الصيدلية؛ الرسائل والمكالمات
-  // تُستهلك مباشرة ولا تُخزَّن، مع احتياط BroadcastChannel عند غياب الخادم.
+  // يتصل بخادم المنصة الفوري بمجرد اختيار الصيدلية (أو استعادته المحفوظ)؛
+  // الرسائل والمكالمات تُستهلك مباشرة ولا تُخزَّن، مع احتياط BroadcastChannel.
   useEffect(() => {
+    try { localStorage.setItem(SHOP_PHARMACY_KEY, JSON.stringify(pharmacyId)) } catch { /* تجاهل */ }
     if (!pharmacyId) return
     const fallbackName = language === 'ar' ? 'زبون' : language === 'fr' ? 'Client' : 'Customer'
     realtime.connect({
@@ -71,7 +81,17 @@ const Shop = () => {
         pharmacyId,
       },
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pharmacyId, currentCustomer?.phone, currentCustomer?.fullName, language])
+
+  // الصيدلية المحفوظة لم تعد موجودة (حُذفت من الخادم) → إعادة الاختيار
+  useEffect(() => {
+    if (pharmacyId && pharmaciesData.length > 0 && !pharmaciesData.some(p => p.id === pharmacyId)) {
+      setPharmacyId(null)
+      setStep('pharmacies')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pharmaciesData])
 
   const pharmacy = pharmaciesData.find(p => p.id === pharmacyId)
   const Arrow = isRTL ? ArrowLeft : ArrowRight

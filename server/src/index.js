@@ -408,6 +408,230 @@ app.post('/api/platform/transfer-ownership', authenticate, requireRole('super_ad
   }
 })
 
+// ===== الطلبات المباشرة (مزامنة عبر الواجهات: Pages / Vercel / أندرويد) =====
+// الطلب يُنشأ عند الزبون (ضيف بلا جلسة) ويُحفظ هنا على خادم المالك، ثم يُبث
+// فورياً لكل الموظفين المتصلين، وأي واجهة تسأل لاحقاً تجد نفس القائمة —
+// فتظهر الطلبات في الواجهات الثلاث آنياً وتُعالَج من أي واجهة على حد سواء.
+// (الدردشة وإشارات المكالمات تبقى بلا تخزين إطلاقاً — قاعدة 8 المحدَّثة.)
+const ORDER_STATUSES = ['pending', 'accepted', 'preparing', 'ready', 'dispatched', 'completed', 'cancelled']
+const ORDER_JSON_MAX = 2 * 1024 * 1024        // 2MB كحد أقصى لكائن الطلب
+const ORDER_ITEMS_MAX = 50
+const ORDER_RATE_WINDOW = 60 * 60 * 1000      // نافذة ساعة واحدة…
+const ORDER_RATE_MAX = 40                     // …لكل IP (إنشاء + تتبع)
+const orderRate = new Map()
+const orderRateLimited = (key) => {
+  const now = Date.now()
+  const rec = orderRate.get(key)
+  if (!rec || now - rec.start > ORDER_RATE_WINDOW) { orderRate.set(key, { start: now, count: 1 }); return false }
+  rec.count += 1
+  return rec.count > ORDER_RATE_MAX
+}
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, rec] of orderRate) { if (now - rec.start > ORDER_RATE_WINDOW) orderRate.delete(key) }
+}, 10 * 60 * 1000).unref()
+
+const strField = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
+const orderRowToObj = (r) => {
+  let data = {}
+  try { data = JSON.parse(r.data || '{}') } catch { /* بيانات تالفة → نُرجع الأعمدة */ }
+  return {
+    ...data,
+    id: r.id, number: r.number, pharmacyId: r.pharmacy_id,
+    status: r.status, total: r.total,
+    createdAt: r.created_at, updatedAt: r.updated_at,
+    items: Array.isArray(data.items) ? data.items : [],
+    customer: data.customer && typeof data.customer === 'object' ? data.customer : { name: r.customer_name, phone: r.customer_phone },
+  }
+}
+
+// إنشاء طلب — متاح للزبناء الضيوف (بلا جلسة) مع تحديد معدل لكل IP
+app.post('/api/orders', (req, res) => {
+  const rateKey = clientIp(req) || 'unknown'
+  if (orderRateLimited(rateKey)) {
+    return res.status(429).json({ error: 'طلبات كثيرة — أعد المحاولة بعد قليل' })
+  }
+  const order = req.body && typeof req.body === 'object' ? req.body : null
+  if (!order || typeof order !== 'object') return res.status(400).json({ error: 'طلب غير صالح' })
+  const id = strField(order.id, 60)
+  const pharmacyId = strField(order.pharmacyId, 40)
+  if (!/^[\w-]{3,60}$/.test(id)) return res.status(400).json({ error: 'معرّف الطلب غير صالح' })
+  if (!pharmacyId || !db.prepare('SELECT id FROM pharmacies WHERE id = ?').get(pharmacyId)) {
+    return res.status(400).json({ error: 'صيدلية غير موجودة' })
+  }
+  if (!Array.isArray(order.items) || order.items.length < 1 || order.items.length > ORDER_ITEMS_MAX) {
+    return res.status(400).json({ error: 'بنود الطلب غير صالحة' })
+  }
+  const items = order.items.map((i) => ({
+    productId: strField(i?.productId, 60), name: strField(i?.name, 120),
+    price: Number.isFinite(Number(i?.price)) ? Number(i.price) : 0,
+    quantity: Math.min(Math.max(Number.isFinite(Number(i?.quantity)) ? Number(i.quantity) : 1, 1), 99),
+    requiresPrescription: !!i?.requiresPrescription,
+  }))
+  const customer = {
+    name: strField(order.customer?.name || order.customer?.fullName, 60) || 'زبون',
+    phone: strField(order.customer?.phone, 30),
+    type: order.customer?.type === 'member' ? 'member' : 'guest',
+  }
+  const status = ORDER_STATUSES.includes(order.status) ? order.status : 'pending'
+  const total = Number.isFinite(Number(order.total)) ? Math.max(0, Number(order.total)) : 0
+  // كائن الطلب الكامل كما تنتجه الواجهة (مع صورة الوصفة إن وجدت)
+  const full = {
+    ...order,
+    id, number: strField(order.number, 40) || `CMD-${id}`,
+    pharmacyId, customer, items, status, total,
+    needsPrescription: !!order.needsPrescription,
+    deliveryMethod: strField(order.deliveryMethod, 20) || 'pickup',
+    deliveryAddress: strField(order.deliveryAddress, 300),
+    subtotal: Number.isFinite(Number(order.subtotal)) ? Number(order.subtotal) : total,
+    deliveryFee: Number.isFinite(Number(order.deliveryFee)) ? Number(order.deliveryFee) : 0,
+    paymentMethod: strField(order.paymentMethod, 30) || 'on_delivery',
+    preferredRole: order.preferredRole === 'pharmacist' ? 'pharmacist' : 'cashier',
+    createdAt: order.createdAt || new Date().toISOString(),
+  }
+  // تنظيف الحقول الضخمة غير الضرورية للمعالجة (الصور ≤ 1.2MB مشفرة)
+  if (full.prescriptionPhoto && typeof full.prescriptionPhoto === 'string' && full.prescriptionPhoto.length > 1_200_000) {
+    delete full.prescriptionPhoto
+  }
+  let serialized
+  try { serialized = JSON.stringify(full) } catch { return res.status(400).json({ error: 'طلب غير قابل للتسلسل' }) }
+  if (serialized.length > ORDER_JSON_MAX) return res.status(413).json({ error: 'حجم الطلب كبير جداً' })
+
+  const now = new Date().toISOString()
+  try {
+    const exists = db.prepare('SELECT id, updated_at FROM orders WHERE id = ?').get(id)
+    if (exists) {
+      // طلب مكرر (إعادة محاولة بعد انقطاع) — نفس المعرف لا يُنشأ مرتين
+      return res.json({ ok: true, id, duplicate: true })
+    }
+    db.prepare(`INSERT INTO orders (id, number, pharmacy_id, customer_name, customer_phone, status, total, item_count, data, created_at, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id, full.number, pharmacyId, customer.name, customer.phone, status, total, items.length, serialized, full.createdAt, now)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+  full.updatedAt = now
+  audit(req, 'order.create', { id, pharmacyId, customer: customer.name, phone: customer.phone, items: items.length, total })
+  realtimeRT.broadcastOrder(full, 'new')
+  res.status(201).json({ ok: true, id, updatedAt: now })
+})
+
+// قائمة الطلبات — للموظفين (جلسة JWT): سوبر أدمين يرى الكل، وغيره صيدليته
+app.get('/api/orders', authenticate, (req, res) => {
+  const isSuper = req.user.role === 'super_admin'
+  let pharmacyId = strField(req.query.pharmacyId, 40)
+  if (!isSuper) pharmacyId = req.user.pharmacyId // غير السوبر أدمين: صيدليته حصراً
+  if (pharmacyId && !isSuper && pharmacyId !== req.user.pharmacyId) {
+    return res.status(403).json({ error: 'ليست لديك الصلاحيات اللازمة' })
+  }
+  const since = strField(req.query.since, 40)
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 200)
+  let sql = 'SELECT * FROM orders'
+  const where = []
+  const params = []
+  if (pharmacyId) { where.push('pharmacy_id = ?'); params.push(pharmacyId) }
+  if (since) { where.push('updated_at > ?'); params.push(since) }
+  if (where.length) sql += ' WHERE ' + where.join(' AND ')
+  sql += ' ORDER BY created_at DESC LIMIT ?'
+  params.push(limit)
+  const rows = db.prepare(sql).all(...params)
+  audit(req, 'order.list', { pharmacyId: pharmacyId || 'all', count: rows.length }, req.user)
+  res.json(rows.map(orderRowToObj))
+})
+
+// تعديل طلب (حالة/إسناد/توصيل) — للموظفين، ويُبث فورياً للزبون والزملاء
+app.patch('/api/orders/:id', authenticate, (req, res) => {
+  const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id)
+  if (!row) return res.status(404).json({ error: 'الطلب غير موجود' })
+  const isSuper = req.user.role === 'super_admin'
+  if (!isSuper && row.pharmacy_id !== req.user.pharmacyId) {
+    return res.status(403).json({ error: 'هذا الطلب يخص صيدلية أخرى' })
+  }
+  const { status, assignedTo, deliveryFee, total, notes, deliveryAddress } = req.body || {}
+  if (status !== undefined && !ORDER_STATUSES.includes(status)) {
+    return res.status(400).json({ error: 'حالة غير صالحة' })
+  }
+  let full
+  try { full = JSON.parse(row.data || '{}') } catch { full = {} }
+  const changes = {}
+  if (status !== undefined) { full.status = status; changes.status = status }
+  if (assignedTo !== undefined) { full.assignedTo = strField(assignedTo, 80) || null; changes.assignedTo = full.assignedTo }
+  if (deliveryFee !== undefined && Number.isFinite(Number(deliveryFee))) { full.deliveryFee = Number(deliveryFee); changes.deliveryFee = full.deliveryFee }
+  if (total !== undefined && Number.isFinite(Number(total))) { full.total = Number(total); changes.total = full.total }
+  if (notes !== undefined) { full.notes = strField(notes, 500); changes.notes = full.notes }
+  if (deliveryAddress !== undefined) { full.deliveryAddress = strField(deliveryAddress, 300); changes.deliveryAddress = full.deliveryAddress }
+  // سجل تاريخ الحالة (يظهر للزبون أينما كان)
+  const history = Array.isArray(full.history) ? full.history : []
+  if (status !== undefined && status !== row.status) {
+    history.push({ status, at: new Date().toISOString(), by: req.user.name || 'موظف' })
+  }
+  full.history = history.slice(-20)
+  const now = new Date().toISOString()
+  full.updatedAt = now
+  let serialized
+  try { serialized = JSON.stringify(full) } catch { return res.status(500).json({ error: 'خطأ تسلسل' }) }
+  if (serialized.length > ORDER_JSON_MAX) return res.status(413).json({ error: 'حجم الطلب كبير جداً' })
+  db.prepare(`UPDATE orders SET status = ?, total = ?, data = ?, updated_at = ? WHERE id = ?`)
+    .run(full.status || row.status, Number.isFinite(Number(full.total)) ? full.total : row.total, serialized, now, row.id)
+  audit(req, 'order.update', { id: row.id, ...changes }, req.user)
+  realtimeRT.broadcastOrder({ ...full, id: row.id, pharmacyId: row.pharmacy_id }, 'update')
+  res.json({ ok: true, id: row.id, updatedAt: now, order: { ...full, id: row.id, pharmacyId: row.pharmacy_id } })
+})
+
+// تتبع طلبات الزبون عبر الأجهزة — بالهاتف فقط وحقول دنيا (بلا بنود ولا صور)
+app.get('/api/orders/track', (req, res) => {
+  const rateKey = clientIp(req) || 'unknown'
+  if (orderRateLimited(rateKey)) {
+    return res.status(429).json({ error: 'طلبات كثيرة — أعد المحاولة بعد قليل' })
+  }
+  const phone = strField(req.query.phone, 30).replace(/[\s-]/g, '')
+  if (!/^\+?\d{6,20}$/.test(phone)) return res.status(400).json({ error: 'رقم هاتف غير صالح' })
+  const rows = db.prepare(
+    `SELECT id, number, pharmacy_id, status, total, item_count, created_at, updated_at
+     FROM orders WHERE customer_phone = ? ORDER BY created_at DESC LIMIT 50`
+  ).all(phone)
+  res.json(rows.map((r) => ({
+    id: r.id, number: r.number, pharmacyId: r.pharmacy_id, status: r.status,
+    total: r.total, itemCount: r.item_count, createdAt: r.created_at, updatedAt: r.updated_at,
+  })))
+})
+
+// إلغاء طلب من طرف الزبون — بلا جلسة: يتحقق من هاتف صاحب الطلب حصراً
+// وبحالة قابلة للإلغاء (قيد الانتظار) كي لا يُلغي أحد طلب غيره.
+app.post('/api/orders/:id/cancel', (req, res) => {
+  const rateKey = clientIp(req) || 'unknown'
+  if (orderRateLimited(rateKey)) {
+    return res.status(429).json({ error: 'طلبات كثيرة — أعد المحاولة بعد قليل' })
+  }
+  const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id)
+  if (!row) return res.status(404).json({ error: 'الطلب غير موجود' })
+  const phone = strField(req.body?.phone, 30).replace(/[\s-]/g, '')
+  const rowPhone = strField(row.customer_phone, 30).replace(/[\s-]/g, '')
+  if (!phone || phone !== rowPhone) {
+    return res.status(403).json({ error: 'رقم الهاتف لا يطابق صاحب الطلب' })
+  }
+  if (row.status !== 'pending' && row.status !== 'accepted') {
+    return res.status(409).json({ error: 'الطلب قيد المعالجة — تواصل مع الصيدلية لإلغائه' })
+  }
+  let full
+  try { full = JSON.parse(row.data || '{}') } catch { full = {} }
+  const now = new Date().toISOString()
+  const history = Array.isArray(full.history) ? full.history : []
+  history.push({ status: 'cancelled', at: now, by: 'customer' })
+  full.status = 'cancelled'
+  full.cancelledAt = now
+  full.cancelledBy = 'customer'
+  full.history = history.slice(-20)
+  full.updatedAt = now
+  let serialized
+  try { serialized = JSON.stringify(full) } catch { return res.status(500).json({ error: 'خطأ تسلسل' }) }
+  db.prepare('UPDATE orders SET status = ?, data = ?, updated_at = ? WHERE id = ?')
+    .run('cancelled', serialized, now, row.id)
+  audit(req, 'order.cancel_customer', { id: row.id, phone }, null)
+  realtimeRT.broadcastOrder({ ...full, id: row.id, pharmacyId: row.pharmacy_id }, 'update')
+  res.json({ ok: true, id: row.id, updatedAt: now })
+})
+
 // ===== الصيدليات =====
 app.get('/api/pharmacies', (_req, res) => {
   res.json(db.prepare('SELECT id, name, nameEn, address, phone, email, license, logo, color, created_at FROM pharmacies').all())
@@ -556,6 +780,7 @@ app.get('/api/data', requireApiKey, (req, res) => {
     suppliers: db.prepare('SELECT * FROM suppliers').all(),
     prescriptions: db.prepare('SELECT * FROM prescriptions').all().map(p => ({ ...p, medications: JSON.parse(p.medications || '[]') })),
     pharmacies: db.prepare('SELECT * FROM pharmacies').all(),
+    orders: db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 500').all().map((o) => { try { return { ...JSON.parse(o.data || '{}'), id: o.id, updatedAt: o.updated_at } } catch { return null } }).filter(Boolean),
     lastSync: getMeta('last_sync'),
   })
 })
@@ -599,6 +824,7 @@ app.get('/api/backup', requireApiKey, (req, res) => {
       suppliers: db.prepare('SELECT * FROM suppliers').all(),
       prescriptions: db.prepare('SELECT * FROM prescriptions').all(),
       sales: db.prepare('SELECT * FROM sales').all(),
+      orders: db.prepare('SELECT id, number, pharmacy_id, customer_name, customer_phone, status, total, item_count, data, created_at, updated_at FROM orders').all(),
       audit_log: db.prepare('SELECT * FROM audit_log').all(),
     }
     const jsonFile = `phmp-backup-${stamp}.json`
@@ -631,9 +857,17 @@ const server = app.listen(PORT, HOST, () => {
 
 // ===== خادم الاتصال الفوري (WebSocket) — التراسل والمكالمات بلا تخزين =====
 // المكالمات الصوتية/المرئية تُستهلك مباشرة بين المستخدمين (WebRTC ندّ لند)؛
-// هذا الخادم يرحّل الرسائل وإشارات الاتصال في الذاكرة فقط (قاعدة 8 — WORKLOG).
-setupRealtime(server, {
-  verifyJwt: (token) => jwt.verify(token, JWT_SECRET),
+// هذا الخادم يرحّل الرسائل وإشارات الاتصال في الذاكرة فقط. الطلبات وحدها
+// تُحفظ في SQLite وتُبث عبر broadcastOrder بعد كل حفظ (قاعدة 8 المحدَّثة).
+const realtimeRT = setupRealtime(server, {
+  // تحقق حي من JWT: يعيد قراءة الدور والحالة من قاعدة البيانات — أي توقيف
+  // أو تخفيض يسري فوراً على الاتصال الفوري أيضاً (لا ينتظر انتهاء الرمز).
+  verifyJwt: (token) => {
+    const payload = jwt.verify(token, JWT_SECRET)
+    const fresh = db.prepare('SELECT role, active, pharmacy_id FROM users WHERE id = ?').get(payload.id)
+    if (!fresh || !fresh.active) throw new Error('الحساب موقوف أو محذوف')
+    return { ...payload, role: fresh.role, pharmacyId: fresh.pharmacy_id }
+  },
   log: (m) => console.log(m),
 })
 

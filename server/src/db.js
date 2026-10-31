@@ -103,6 +103,27 @@ export function initSchema() {
     );
     CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
 
+    -- الطلبات المباشرة (زبون ← صيدلية): تُخزَّن على خادم المالك حصراً كي تظهر
+    -- آنياً في كل الواجهات (Pages/Vercel/أندرويد) ويمكن معالجتها من أي واجهة
+    -- (تكليف صريح من المالك في v2.1.0 — راجع WORKLOG القاعدة 8 المحدَّثة).
+    -- «data» يحمل كائن الطلب الكامل (JSON) والأعمدة المستخرجة للفهرسة والبحث.
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      number TEXT,
+      pharmacy_id TEXT NOT NULL REFERENCES pharmacies(id),
+      customer_name TEXT,
+      customer_phone TEXT,
+      status TEXT DEFAULT 'pending',
+      total REAL DEFAULT 0,
+      item_count INTEGER DEFAULT 0,
+      data TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_orders_pharmacy ON orders(pharmacy_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(customer_phone, created_at);
+    CREATE INDEX IF NOT EXISTS idx_orders_updated ON orders(updated_at);
+
     CREATE TABLE IF NOT EXISTS audit_log (
       id TEXT PRIMARY KEY,
       timestamp TEXT NOT NULL,

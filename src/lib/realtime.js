@@ -61,8 +61,21 @@ class RealtimeClient {
 
   // ===== الاتصال =====
   // للموظفين: connect({ token, userId, name, role }) — للزبناء: connect({ guest: { name, phone, pharmacyId } })
+  // idempotent: إن كان الاتصال قائماً بنفس الهوية فلا يُعاد فتحه — يُستدعى بأمان
+  // عند الإقلاع (استعادة الجلسة) وعند الدخول اليدوي معاً.
   connect(auth) {
     if (typeof window === 'undefined') return
+    const sameIdentity = (a, b) => {
+      if (!a || !b) return false
+      if (a.token && b.token) return true                       // موظف بنفس الرمز المخزن
+      if (a.guest && b.guest) return a.guest.name === b.guest.name && a.guest.pharmacyId === b.guest.pharmacyId
+      return false
+    }
+    const live = this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)
+    if (live && sameIdentity(this.auth, auth)) {
+      this.auth = auth // تحديث المرجع فقط (الرمز نفسه)
+      return
+    }
     this.auth = auth
     this.manualClose = false
     if (auth?.token) {
@@ -126,7 +139,13 @@ class RealtimeClient {
       clearTimeout(failTimer)
       clearInterval(this.pingTimer)
       this.setStatus('offline')
-      if (!this.manualClose && event.code !== 4003) this.scheduleReconnect()
+      // 4003 = مصادقة غير صالحة (رمز JWT منتهٍ أو حساب موقوف): لا إعادة اتصال،
+      // بل إشعار صريح للواجهة كي تنهي الجلسة بأناقة بدل البقاء «ظاهرياً متصلاً».
+      if (event.code === 4003) {
+        this.emit({ type: 'session_expired', via: 'server' })
+        return
+      }
+      if (!this.manualClose) this.scheduleReconnect()
     }
 
     ws.onerror = () => { /* onclose سيتولى الأمر */ }

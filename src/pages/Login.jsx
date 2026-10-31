@@ -18,6 +18,7 @@ const Login = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [serverCheck, setServerCheck] = useState('checking') // checking | online | offline
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   const L = (ar, fr, en) => language === 'ar' ? ar : language === 'fr' ? fr : en
 
@@ -28,6 +29,16 @@ const Login = () => {
       if (alive) setServerCheck(online ? 'online' : 'offline')
     })
     return () => { alive = false }
+  }, [])
+
+  // لافتة انتهاء الجلسة: يضعها سياق التطبيق عند انتهاء صلاحية الرمز (12 ساعة)
+  // أو توقيف الحساب — كي يعرف الموظف لماذا وجد نفسه في شاشة الدخول.
+  useEffect(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('pharmacare_session_expired') || 'null')
+      if (v && Date.now() - Number(v) < 5 * 60 * 1000) setSessionExpired(true)
+      localStorage.removeItem('pharmacare_session_expired')
+    } catch { /* تجاهل */ }
   }, [])
 
   const handleLogin = async (e) => {
@@ -169,6 +180,14 @@ const Login = () => {
 
           <h2 className="text-2xl font-bold text-gray-900 mb-1">{t('staffEntrance')}</h2>
           <p className="text-sm text-gray-600 mb-4">{t('loginSubtitle')}</p>
+
+          {/* لافتة انتهاء الجلسة — إشعار واضح بدل العودة الصامتة لشاشة الدخول */}
+          {sessionExpired && (
+            <div className="flex items-start gap-2 text-xs px-3 py-2.5 rounded-lg mb-4 bg-amber-50 text-amber-700 border border-amber-200">
+              <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />
+              <span className="font-medium">{t('sessionExpiredBanner')}</span>
+            </div>
+          )}
 
           {/* مؤشر حالة الخادم — الدخول يستوجب اتصالاً بخادم المنصة */}
           <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg mb-5 ${

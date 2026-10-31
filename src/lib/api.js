@@ -212,6 +212,65 @@ export const api = {
     return data
   },
 
+  // ===== الطلبات المباشرة (مزامنة عبر الواجهات: Pages/Vercel/أندرويد) =====
+  // تُحفظ على خادم المالك (SQLite) وتبث فورياً — تكليف صريح من المالك v2.1.0.
+  async createOrder(order) {
+    const res = await request('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify(order),
+      timeout: 10000,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw Object.assign(new Error(data.error || 'فشل حفظ الطلب على الخادم'), { status: res.status })
+    return data
+  },
+
+  // جلب الطلبات (موظفون — JWT): نفس القائمة على كل الواجهات
+  async fetchOrders({ since, limit, pharmacyId } = {}) {
+    const qs = new URLSearchParams()
+    if (since) qs.set('since', since)
+    if (limit) qs.set('limit', String(limit))
+    if (pharmacyId) qs.set('pharmacyId', pharmacyId)
+    const res = await authRequest(`/api/orders${qs.toString() ? '?' + qs.toString() : ''}`, { timeout: 10000 })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw Object.assign(new Error(data.error || 'فشل جلب الطلبات'), { status: res.status })
+    return Array.isArray(data) ? data : []
+  },
+
+  // تحديث حالة الطلب على الخادم (يبثها فورياً لكل الأجهزة)
+  async updateOrderRemote(id, updates) {
+    const res = await authRequest(`/api/orders/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+      timeout: 10000,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw Object.assign(new Error(data.error || 'فشل تحديث الطلب'), { status: res.status })
+    return data
+  },
+
+  // إلغاء طلب من طرف الزبون (يتحقق الخادم من هاتف صاحب الطلب)
+  async cancelOrderRemote(id, phone) {
+    const res = await request(`/api/orders/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+      timeout: 10000,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw Object.assign(new Error(data.error || 'فشل إلغاء الطلب'), { status: res.status })
+    return data
+  },
+
+  // تتبع طلبات الزبون بالهاتف (حقول دنيا — عبر الأجهزة)
+  async trackOrders(phone) {
+    if (!phone) return []
+    const qs = new URLSearchParams({ phone: String(phone) })
+    const res = await request(`/api/orders/track?${qs.toString()}`, { timeout: 8000 })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw Object.assign(new Error(data.error || 'فشل تتبع الطلبات'), { status: res.status })
+    return Array.isArray(data) ? data : []
+  },
+
   // مزامنة كاملة للبيانات مع قاعدة SQLite
   async sync(payload) {
     try {

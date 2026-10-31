@@ -1,10 +1,10 @@
-import { createContext, useContext, useState, useEffect, useMemo } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { translations, pickName as pickNameI18n, pickAddress as pickAddressI18n } from '../i18n/translations'
 import { pharmacies as defaultPharmacies, users as defaultUsers, customers, suppliers, prescriptions, sales } from '../data/mockData'
 import { moroccanDrugs } from '../data/moroccanDrugs'
 import { categories as moroccanCategories } from '../data/categories'
 import { roleHasPermission, ROLE_INFO } from '../config/permissions'
-import { api } from '../lib/api'
+import { api, getAuthToken } from '../lib/api'
 import { realtime } from '../lib/realtime'
 import sounds from '../lib/sounds'
 
@@ -12,6 +12,40 @@ import sounds from '../lib/sounds'
 const TOP_DRUGS_COUNT = 200
 
 const AppContext = createContext()
+
+// =====================================================================
+// دمج قوائم الطلبات (محلي + خادم): الأحدث updatedAt يفوز، والمحلي فقط يبقى،
+// والطلبات الدنيا (تتبع الزبون) لا تمسح البنود الكاملة المحلية.
+// =====================================================================
+const mergeOrders = (local, incoming) => {
+  const byId = new Map()
+  const push = (o) => {
+    if (!o || !o.id) return
+    const cur = byId.get(o.id)
+    if (!cur) {
+      byId.set(o.id, {
+        ...o,
+        items: Array.isArray(o.items) ? o.items : [],
+        customer: o.customer && typeof o.customer === 'object' ? o.customer : { name: '', phone: '' },
+      })
+      return
+    }
+    const aT = Date.parse(cur.updatedAt || cur.createdAt || 0) || 0
+    const bT = Date.parse(o.updatedAt || o.createdAt || 0) || 0
+    if (bT >= aT) {
+      byId.set(o.id, {
+        ...cur, ...o,
+        items: Array.isArray(o.items) && o.items.length ? o.items : cur.items,
+        customer: o.customer && typeof o.customer === 'object' ? o.customer : cur.customer,
+      })
+    }
+  }
+  ;(Array.isArray(local) ? local : []).forEach(push)
+  ;(Array.isArray(incoming) ? incoming : []).forEach(push)
+  return [...byId.values()]
+    .sort((x, y) => (Date.parse(y.createdAt || 0) || 0) - (Date.parse(x.createdAt || 0) || 0))
+    .slice(0, 200)
+}
 
 // =====================================================================
 // ترحيل البيانات المحلية القديمة (إصلاح جذري لخلل اللغة المختلطة في التقارير):
@@ -196,12 +230,40 @@ export const AppProvider = ({ children }) => {
     if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f172a' : '#10b981')
   }, [theme])
 
-  // فحص الخادم المحلي عند الإقلاع
+  // فحص الخادم المحلي عند الإقلاع + تحديث قائمة الصيدليات من المصدر الموثوق
+  // (نقطة عامة بلا جلسة): يضمن أن زبناء المتجر يطلبون من صيدليات قائمة فعلاً
+  // على الخادم — وإلا فُشل حفظ الطلب لدى صيدلية حُذفت أو أُعيدت هيكلتها.
   useEffect(() => {
-    api.checkHealth().then((online) => {
+    let alive = true
+    api.checkHealth().then(async (online) => {
+      if (!alive) return
       setServerStatus((s) => ({ ...s, online }))
+      if (!online) return
+      try {
+        const fresh = await api.fetchPharmacies()
+        if (alive && Array.isArray(fresh) && fresh.length > 0) {
+          setPharmaciesData((prev) => (JSON.stringify(prev) === JSON.stringify(fresh) ? prev : fresh))
+        }
+      } catch { /* قائمة محلية سليمة كافية مؤقتاً */ }
     }).catch(() => {})
+    return () => { alive = false }
   }, [])
+
+  // مرجع حي لقائمة الطلبات (تستعمله مزامنة الخلفية دون إعادة تسجيل مستمرة)
+  const ordersRef = useRef(ordersData)
+  useEffect(() => { ordersRef.current = ordersData }, [ordersData])
+
+  // ===== اتصال فوري تلقائي عند استعادة الجلسة (إصلاح خلل جذري v2.1.0) =====
+  // كان الاتصال يُفتح عند الدخول اليدوي فقط — فأي إعادة تحميل للصفحة أو إعادة
+  // فتح للتطبيق تُبقي الجلسة مستعادة لكن بلا اتصال: لا رسائل ولا مكالمات ولا
+  // مزامنة طلبات. الآن يتصل تلقائياً أينما وُجد مستخدم بجلسة صالحة.
+  useEffect(() => {
+    if (!currentUser) return
+    const token = getAuthToken()
+    if (!token) return
+    realtime.connect({ token, userId: currentUser.id, name: currentUser.name, role: currentUser.role })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id])
 
   // تحديث الطلبات فورياً عند تعديلها من نافذة أخرى (اتصال مباشر زبون ↔ صيدلية)
   // الطلبات تصل مباشرة إلى بيئة الصيدلية ولا تمر عبر خادم المنصة
@@ -219,17 +281,37 @@ export const AppProvider = ({ children }) => {
   }, [])
 
   // ===== جسر الاتصال الفوري: الطلبات الواردة من أجهزة أخرى (زبون ↔ موظفون) =====
-  // طلب جديد يصل من هاتف الزبون → يُستهلك مباشرة في هذه الجلسة (بلا تخزين
-  // خادمي)؛ وتحديثات الحالة تصل الزبون فورياً أينما كان. مع نغمة تنبيه.
+  // الطلب يُبث من الخادم الفوري بعد حفظه (أو احتياط BroadcastChannel محلياً)؛
+  // وتحديثات الحالة تصل الزبون فورياً أينما كان. مع نغمة تنبيه.
   useEffect(() => {
     const off = realtime.onMessage((msg) => {
       if (!msg) return
+
+      // انتهاء صلاحية الجلسة (رمز JWT منتهٍ أو حساب موقوف): إنهاء أنيق بدل
+      // البقاء «ظاهرياً متصلاً» بلا استجابة — مع إشعار واضح عند شاشة الدخول.
+      if (msg.type === 'session_expired') {
+        if (currentUser) {
+          api.logout()
+          realtime.disconnect()
+          setCurrentUser(null)
+          setCurrentPharmacy(null)
+          setActivePharmacyId(null)
+          try { localStorage.setItem('pharmacare_session_expired', JSON.stringify(Date.now())) } catch { /* تجاهل */ }
+        }
+        return
+      }
 
       // طلب جديد/تحديث حالة (من خادم فوري أو احتياط BroadcastChannel)
       if (msg.type === 'order' && msg.order) {
         const incoming = msg.order
         if (msg.action === 'update') {
-          setOrdersData((prev) => prev.map(o => (o.id === incoming.id ? { ...o, ...incoming, items: incoming.items || o.items } : o)))
+          setOrdersData((prev) => {
+            const found = prev.some(o => o.id === incoming.id)
+            if (!found) return mergeOrders(prev, [incoming])
+            return prev.map(o => (o.id === incoming.id ? { ...o, ...incoming, items: incoming.items || o.items } : o))
+          })
+          // نغمة تنبيه للزبون عند تغير حالة طلبه
+          if (!currentUser && currentCustomer) sounds.message()
         } else {
           // طلب جديد: تجاهل التكرار (قد يصل عبر القناتين) + تنبيه صوتي للموظفين
           setOrdersData((prev) => (prev.some(o => o.id === incoming.id) ? prev : [incoming, ...prev].slice(0, 200)))
@@ -267,7 +349,7 @@ export const AppProvider = ({ children }) => {
     })
     return off
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, language])
+  }, [currentUser, currentCustomer, language])
 
   // مراقبة طلبات الزبون الحالية (استقبال تحديثاتها عبر الأجهزة)
   useEffect(() => {
@@ -278,6 +360,63 @@ export const AppProvider = ({ children }) => {
       .map(o => o.id)
     if (myOrderIds.length > 0) realtime.watchOrders(myOrderIds)
   }, [currentCustomer, ordersData])
+
+  // ===== مزامنة الطلبات مع الخادم (إصلاح خلل جذري v2.1.0) =====
+  // الطلب كان يُبث للمتصلين لحظياً فقط، فمن لم يكن متصلاً لا يصله أبداً ولا
+  // يظهر في واجهته. الآن: تُحفظ الطلبات على خادم المالك وتُجلب عند الإقلاع
+  // وعند كل عودة للاتصال — فتظهر في كل الواجهات (Pages/Vercel/أندرويد) ويمكن
+  // معالجتها من أي واجهة. كما تُدفع الطلبات المحلية التي أُنشئت أثناء انقطاع
+  // الخادم (زبون بلا اتصال) فور توفره.
+  useEffect(() => {
+    let cancelled = false
+
+    const pushUnsynced = async (serverOrders) => {
+      const phone = currentCustomer?.phone
+      if (!phone) return
+      const serverIds = new Set((serverOrders || []).map(o => o.id))
+      const unsynced = ordersRef.current
+        .filter(o => o.customer?.phone === phone && !o._synced && !serverIds.has(o.id))
+        .slice(0, 10)
+      for (const o of unsynced) {
+        try {
+          await api.createOrder(o)
+          if (!cancelled) setOrdersData(prev => prev.map(x => (x.id === o.id ? { ...x, _synced: true } : x)))
+        } catch { /* الخادم رفض — يُعاد عند المزامنة التالية */ }
+      }
+    }
+
+    const expireSession = () => {
+      api.logout()
+      realtime.disconnect()
+      setCurrentUser(null)
+      setCurrentPharmacy(null)
+      setActivePharmacyId(null)
+      try { localStorage.setItem('pharmacare_session_expired', JSON.stringify(Date.now())) } catch { /* تجاهل */ }
+    }
+
+    const syncNow = async () => {
+      try {
+        if (currentUser) {
+          const fresh = await api.fetchOrders({ limit: 200 })
+          if (cancelled || !Array.isArray(fresh)) return
+          setOrdersData(prev => mergeOrders(prev, fresh))
+        } else if (currentCustomer?.phone) {
+          const tracked = await api.trackOrders(currentCustomer.phone)
+          if (cancelled || !Array.isArray(tracked)) return
+          setOrdersData(prev => mergeOrders(prev, tracked))
+          await pushUnsynced(tracked)
+        }
+      } catch (err) {
+        if (err?.status === 401 && currentUser) expireSession()
+        /* الخادم غير متاح — تعمل المنصة محلياً وتُزامن عند عودة الاتصال */
+      }
+    }
+
+    syncNow()
+    const off = realtime.onStatus((s) => { if (s === 'online') syncNow() })
+    return () => { cancelled = true; off() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentCustomer?.phone])
 
   // الترجمة مع سلسلة احتياطية (اللغة → العربية → المفتاح)
   const t = (key) => translations[language]?.[key] || translations.ar?.[key] || key
@@ -321,7 +460,7 @@ export const AppProvider = ({ children }) => {
     // اتصال فوري (WebSocket) للتراسل والمكالمات عبر الأجهزة — بعد الدخول برمز JWT
     try {
       realtime.connect({
-        token: api.getAuthToken(),
+        token: getAuthToken(),
         userId: user.id, name: user.name, role: user.role,
       })
     } catch { /* الاتصال الفوري اختياري — احتياط BroadcastChannel محلي */ }
@@ -654,10 +793,10 @@ export const AppProvider = ({ children }) => {
 
   // =====================================================================
   // ===== الطلبات المباشرة (زبون ← صيدلية) =====
-  // الطلب يُبث فورياً عبر الاتصال الفوري إلى أجهزة موظفي الصيدلية
-  // (WebSocket عبر الأجهزة + احتياط BroadcastChannel محلياً)، ويُحفظ محلياً
-  // في بيئة كل طرف فقط (localStorage) — لا يُخزَّن إطلاقاً في خادم المنصة.
-  // الدردشة تبقى في الذاكرة المؤقتة وتُستهلك فورياً.
+  // الطلب يُحفظ فوراً على خادم المالك (SQLite) ويُبث لكل الموظفين المتصلين
+  // عبر الخادم الفوري الموحد — فيظهر في الواجهات الثلاث (Pages/Vercel/أندرويد)
+  // آنياً ويمكن معالجته من أي واجهة. عند غياب الخادم يعمل محلياً ويُزامن
+  // تلقائياً عند عودة الاتصال. الدردشة والمكالمات تبقى بلا تخزين إطلاقاً.
   // =====================================================================
   const addOrder = (order, { silent = false } = {}) => {
     // استيراد طلب ورد من جهاز آخر (له معرّف محدد) — بلا إعادة بث (منع الحلقات)
@@ -677,8 +816,13 @@ export const AppProvider = ({ children }) => {
     }
     setOrdersData((prev) => [newOrder, ...prev].slice(0, 200))
     if (!silent) {
-      // بث فوري لكل أجهزة الصيدلية — يُستهلك مباشرة بلا أي تخزين خادمي
+      // بث فوري احتياطي (نفس المتصفح) + حفظ على الخادم الذي يبثه لكل الأجهزة
       realtime.announceOrder(newOrder)
+      api.createOrder(newOrder)
+        .then(() => {
+          setOrdersData(prev => prev.map(o => (o.id === newOrder.id ? { ...o, _synced: true } : o)))
+        })
+        .catch(() => { /* الخادم غير متاح — يُزامن تلقائياً عند عودة الاتصال */ })
     }
     return newOrder
   }
@@ -687,11 +831,14 @@ export const AppProvider = ({ children }) => {
     const target = ordersData.find(o => o.id === id)
     if (!target) return null
     // نحسب الطلب المحدّث فورياً (لا نعتمد على محدّث الحالة غير المتزامن)
-    const updated = { ...target, ...updates }
+    const updated = { ...target, ...updates, updatedAt: new Date().toISOString() }
     setOrdersData(prev => prev.map(o => (o.id === id ? { ...o, ...updates } : o)))
     if (broadcast) {
-      // بث لكل الأجهزة (الزبون + بقية الموظفين) — مباشر بلا تخزين
+      // بث احتياطي محلي + حفظ على الخادم (يبثه لكل الأجهزة بما فيها الزبون)
       realtime.announceOrderUpdate(id, updated.status, { order: updated })
+      if (currentUser) {
+        api.updateOrderRemote(id, updates).catch(() => { /* يُزامن لاحقاً */ })
+      }
     }
     return updated
   }
@@ -699,6 +846,10 @@ export const AppProvider = ({ children }) => {
   const cancelOrder = (id, byCustomer = false) => {
     const order = ordersData.find(o => o.id === id)
     if (!order || (order.status !== 'pending' && !byCustomer)) return false
+    // الزبون يلغي عبر نقطة مخصصة بتحقق الهاتف (بلا جلسة)؛ الموظف عبر PATCH
+    if (byCustomer && currentCustomer?.phone) {
+      api.cancelOrderRemote(id, currentCustomer.phone).catch(() => { /* يُزامن لاحقاً */ })
+    }
     updateOrder(id, { status: 'cancelled', cancelledAt: new Date().toISOString(), cancelledBy: byCustomer ? 'customer' : 'staff' })
     return true
   }
@@ -712,8 +863,9 @@ export const AppProvider = ({ children }) => {
   }, [ordersData, currentUser, isSuperAdmin])
 
   // ===== المزامنة مع الخادم المحلي (SQLite) =====
-  // ملاحظة امتثال: الطلبات والدردشات مستثناة عمداً من المزامنة لأنها
-  // تُستهلك مباشرة عبر الاتصال الفوري ولا تُسجَّل في خادم المنصة.
+  // الطلبات تُزامَن عبر نقاطها المخصصة (أعلاه) عند الإنشاء والتحديث والجلب؛
+  // الدردشات وإشارات المكالمات مستثناة عمداً لأنها تُستهلك مباشرة عبر
+  // الاتصال الفوري ولا تُسجَّل في خادم المنصة (خصوصية تامة).
   const syncToServer = async () => {
     const payload = {
       products: productsData, customers: customersData, suppliers: suppliersData,
