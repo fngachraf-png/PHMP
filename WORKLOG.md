@@ -12,6 +12,7 @@
 | البند | القيمة |
 |---|---|
 | المستودع | https://github.com/fngachraf-png/PHMP.git (فرع `main`) |
+| المستودع الاحتياطي | https://github.com/tarikchouika/PHMP.git (مرآة تلقائية عند كل دفع عبر `.github/workflows/mirror-backup.yml`) |
 | النشر الرئيسي | https://phmp.pages.dev (Cloudflare Pages — بناء تلقائي من `main`) |
 | نشر احتياطي | https://pharmacare-pro-jade.vercel.app (Vercel — ثابت) |
 | تحميل تطبيق أندرويد | https://phmp-download.pages.dev/PHMP.apk |
@@ -619,3 +620,31 @@ Deployment:
 
 Stage Summary:
 - المهام الخمس المنجزة كاملة: نقل الملكية + سوبر أدمين (15/15)، إصلاح فيض المتزر جذرياً (390=390)، أيقونة أندرويد adaptive + splash + صلاحيات، الاتصال الفوري عبر الأجهزة (19/19: رسائل/مكالمات/طلبات/نغمات)، وصلاحيات الموقع/الكاميرا/المايك للمنصة والتطبيق. كل المكتسبات محفوظة والترجمات متوازنة.
+
+---
+Task ID: 15
+Agent: Local Server Agent (OpenCode)
+Date: 2026-10-31
+Task: مزامنة v2.0.0 محلياً + إصلاح تعليق النفق (IPv4) + مرآة احتياطية تلقائية بين حسابَي GitHub + مواءمة HRMP
+
+Work Log:
+- **مزامنة الإصدار محلياً**: `git pull` = `Already up to date` (HEAD = origin/main = `bceb3dd`) · `cd server && npm install` = `up to date, audited 122 packages` و`found 0 vulnerabilities` · تحقق تحميل `ws` (`server/node_modules/ws/index.js`) و`better-sqlite3` (`{ x: 1 }`) قبل إعادة التشغيل.
+- **تعليق النفق (خلل جذري — مشخّص بالسجل)**: أول `phmp-guard.sh restart` أعاد الخادم لكن النفق بقي بلا اتصال (`❌ النفق لم يتصل بعد 30 ثانية`)، وآخر سطر في `server/logs/tunnel.log` كان `INF ICMP proxy will use 192.168.1.58 as source for IPv4` بلا أي سطر بعده — أي تعليق داخل تهيئة ICMPv6. تجربة معزولة (منفذ metrics 20245، مهلة 25ث) بـ`--edge-ip-version 4` أثبتت السبب: `Registered tunnel connection` على أربع قنوات خلال ثانيتين. الإصلاح: إضافة `--edge-ip-version 4` إلى `server/tunnel/start-tunnel.sh` مع تعليق يوضح السبب (commit `ca3edd9`).
+- **النسخة الاحتياطية بين الحسابين (PHMP)**: أُنشئ fork `tarikchouika/PHMP` (public، parent = `fngachraf-png/PHMP`) وأُضيف remote محلي اسمه `backup` (بلا توكن مضمَّن). أُضيف سير `.github/workflows/mirror-backup.yml`: عند كل دفع إلى `main` يدفع `--force` إلى المرآة مع الوسوم، ثم **يتحقق من تطابق بصمة `main`** ويفشل إن اختلفت. السر `BACKUP_TOKEN` (صلاحية `repo` على الحساب الاحتياطي) مضبوط في GitHub Secrets فقط — لا توكن في أي ملف.
+- **إصلاح فشل المزامنة الأول (403)**: التشغيل الأول (`d26522a`) فشل بـ`Permission to tarikchouika/PHMP.git denied to github-actions[bot]` لأن `actions/checkout` يحفظ `GITHUB_TOKEN` كترويسة `extraheader` فتتجاوز توكن الاحتياط. الإصلاح: `persist-credentials: false` + `git config --local --unset-all http.https://github.com/.extraheader` قبل الدفع.
+- **مواءمة HRMP**: تبيّن أن تاريخَي `tarikchouika/HRMP` و`fngachraf-png/HRMP` **متباعدان** (61 مقابل 69 commit، منها 49 مكافئ patchياً)، والفرق الشجري 23 ملفاً و`+1103/−35` لصالح `fngachraf` (الوحيد غير الموجود فيه: `infra/vercel/preview.db` وهو أصل مولَّد). للحفاظ على العمل: حُفظ `main` القديم في فرع `archive/pre-sync-2026-10-31` (`648d498`) على `tarikchouika/HRMP`، ثم دُفع `main` الجديد `917186a` مع الوسوم.
+
+Testing:
+- **الخدمة من العنوان العام**: `https://phmp-api.balbolghol-ai.workers.dev/api/health` ⇒ `200` و`{"ok":true,"database":"ok"}` · `wss://phmp-api.balbolghol-ai.workers.dev/ws` ⇒ `OPEN` (بعد إصلاح النفق) · `http://127.0.0.1:20244/ready` ⇒ `200` · `phmp-guard.sh check` ⇒ exit 0 بلا إعادة تشغيل · `status`: الخادم حيّ والنفق `UP` و`fails: 0`.
+- **سير المزامنة**: التشغيل `41188437662` = **success**، وسجلّه: `local = 48f6dc301524ac1e0e44b86c2544ae03364d3404` و`backup = 48f6dc301524ac1e0e44b86c2544ae03364d3404` ثم `✅ المرآة مطابقة تماماً`. التشغيل الفاشل الأول موثَّق أعلاه كسبب/علاج.
+- **تطابق الحسابين**: `fngachraf-png/PHMP` = `tarikchouika/PHMP` = `48f6dc3` · `fngachraf-png/HRMP` = `tarikchouika/HRMP` = `917186a` · فرع الأرشيف موجود على `648d498`.
+- **YAML**: `mirror-backup.yml` يُحلَّل بلا أخطاء (`yaml.safe_load`) قبل كل دفع.
+
+Deployment:
+- commits إلى `main`: `ca3edd9` (النفق) · `d26522a` (السير) · `48f6dc3` (إصلاح الاعتماد) — لا تغيير في `src/**` أو `public/**` ⇒ سيرا Pages وAndroid لم يُشغَّلا بفضل مرشّح المسارات.
+- **سر جديد**: `BACKUP_TOKEN` في `fngachraf-png/PHMP` (مشفَّر). عند تدوير توكن الحساب الاحتياطي يجب تحديثه: `gh secret set BACKUP_TOKEN --repo fngachraf-png/PHMP`.
+
+Stage Summary:
+- البيئة المحلية على v2.0.0 تعمل، والنفق مستقر على IPv4، والاتصال الفوري (wss) متاح من العنوان العام.
+- النسخة الاحتياطية صارت **تلقائية** لـPHMP عند كل دفع، ومُتحقَّقاً منها بالبصمة؛ وHRMP مُواءَم مع حفظ تاريخه القديم في فرع أرشيف.
+- المتبقي: (1) توكن `tarikchouika` ما زال مخزَّناً نصًّا في قاعدة المعرفة — يُنصح بتدويره؛ (2) يمكن تعميم سير المرآة على HRMP بنفس النمط إن أراد المالك.

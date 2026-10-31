@@ -91,6 +91,7 @@ bash start-tunnel.sh        # تشغيل يدوي (الحارس يشغّله ع�
 
 - `start-tunnel.sh` يفضّل `/usr/local/bin/cloudflared` (وليس نسخة npm القديمة) ويستعمل `--metrics 127.0.0.1:20244`.
 - النفق يعمل بـ `--protocol http2` لأن QUIC متذبذب على شبكة الهاتف.
+- **IPv4 فقط** (`--edge-ip-version 4`): تهيئة ICMPv6 كانت تُعلّق cloudflared بعد سطر `ICMP proxy … IPv4` بلا أي اتصال (حتى 2026-10-31). الخيار يمنع التعليق والاتصال يتم خلال ثوانٍ — لا تُزله.
 - بعد التشغيل تحقق: `curl http://127.0.0.1:20244/ready` → 200 (يعني اتصالاً فعلياً بالحافة).
 
 ### 3) Worker + VPC
