@@ -1,0 +1,57 @@
+name: 🛟 مزامنة النسخة الاحتياطية (الحساب الثاني)
+
+# الغاية: مرآة كاملة للمستودع في الحساب الاحتياطي tarikchouika/PHMP
+# كي لا يضيع العمل إذا أُقفل الحساب الأساسي. يعمل عند كل دفع إلى main،
+# ولا يحتاج إلا سراً واحداً: BACKUP_TOKEN (صلاحية repo على الحساب الاحتياطي).
+# ملاحظة: لا يمسّ هذا السير النشر أو APK — مسؤولية سيرَي deploy-cloudflare وandroid-release.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-backup
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: دفع المرآة والتحقق من البصمة
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout (كامل التاريخ والوسوم)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🪞 دفع المرآة إلى tarikchouika/PHMP
+        env:
+          BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKUP_TOKEN:-}" ]; then
+            echo "::error::السر BACKUP_TOKEN غير مضبوط — المزامنة متوقفة"
+            exit 1
+          fi
+          REMOTE="https://x-access-token:${BACKUP_TOKEN}@github.com/tarikchouika/PHMP.git"
+          # --force مقصود: المرآة يجب أن تطابق الأصل حتى بعد إعادة كتابة التاريخ
+          git push --force "$REMOTE" "HEAD:refs/heads/main"
+          git push --force --tags "$REMOTE"
+
+      - name: ✅ التحقق من تطابق بصمة main
+        env:
+          BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
+        run: |
+          set -euo pipefail
+          LOCAL="$(git rev-parse HEAD)"
+          REMOTE="$(git ls-remote "https://x-access-token:${BACKUP_TOKEN}@github.com/tarikchouika/PHMP.git" refs/heads/main | cut -f1)"
+          echo "local  = $LOCAL"
+          echo "backup = $REMOTE"
+          if [ "$LOCAL" != "$REMOTE" ]; then
+            echo "::error::بصمة النسخة الاحتياطية لا تطابق الأصل"
+            exit 1
+          fi
+          echo "✅ المرآة مطابقة تماماً"
