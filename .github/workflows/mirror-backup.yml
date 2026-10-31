@@ -26,6 +26,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # لا تُخزَّن بيانات اعتماد الحساب الأساسي كي لا تتجاوز توكن الحساب الاحتياطي
+          persist-credentials: false
 
       - name: 🪞 دفع المرآة إلى tarikchouika/PHMP
         env:
@@ -37,6 +39,8 @@ jobs:
             exit 1
           fi
           REMOTE="https://x-access-token:${BACKUP_TOKEN}@github.com/tarikchouika/PHMP.git"
+          # تنظيف أي ترويسة اعتماد متبقية من actions/checkout (كانت تُلغي توكن الاحتياط)
+          git config --local --unset-all "http.https://github.com/.extraheader" || true
           # --force مقصود: المرآة يجب أن تطابق الأصل حتى بعد إعادة كتابة التاريخ
           git push --force "$REMOTE" "HEAD:refs/heads/main"
           git push --force --tags "$REMOTE"
