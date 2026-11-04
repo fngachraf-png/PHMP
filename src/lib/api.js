@@ -163,6 +163,24 @@ async function liveOrGateway(path, options = {}) {
   }
 }
 
+// طلب مصادق (موظف): يضاف سقوط للبوابة عند «تعذر التحقق» من الطبقة السحابية
+// (503 verify_unavailable — السر غير مضبوط والهاتف نائم/قديم) — أما 401
+// الحقيقي فيُمرّر كما هو (الرمز فاسد فعلاً والبوابة ستقول الشيء نفسه).
+async function liveAuthOrGateway(path, options = {}) {
+  let res
+  try {
+    res = await liveRequest(path, options)
+  } catch (err) {
+    if (!err?.networkError) throw err
+    return request(path, options)
+  }
+  if (res.status === 503) {
+    const body = await res.clone().json().catch(() => ({}))
+    if (body?.error === 'verify_unavailable') return request(path, options)
+  }
+  return res
+}
+
 export const api = {
   // فحص جاهزية الخادم
   async checkHealth() {
@@ -344,14 +362,7 @@ export const api = {
     if (since) qs.set('since', since)
     if (limit) qs.set('limit', String(limit))
     if (pharmacyId) qs.set('pharmacyId', pharmacyId)
-    const path = `/api/orders${qs.toString() ? '?' + qs.toString() : ''}`
-    let res
-    try {
-      res = await liveRequest(path, { timeout: 10000, headers: authHeaders() })
-    } catch (err) {
-      if (!err?.networkError) throw err
-      res = await request(path, { timeout: 10000, headers: authHeaders() })
-    }
+    const res = await liveAuthOrGateway(`/api/orders${qs.toString() ? '?' + qs.toString() : ''}`, { timeout: 10000, headers: authHeaders() })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw Object.assign(new Error(data.error || 'فشل جلب الطلبات'), { status: res.status })
     return Array.isArray(data) ? data : []
@@ -359,14 +370,7 @@ export const api = {
 
   // تحديث حالة الطلب (يبثها فورياً لكل الأجهزة)
   async updateOrderRemote(id, updates) {
-    const path = `/api/orders/${encodeURIComponent(id)}`
-    let res
-    try {
-      res = await liveRequest(path, { method: 'PATCH', body: JSON.stringify(updates), timeout: 10000, headers: authHeaders() })
-    } catch (err) {
-      if (!err?.networkError) throw err
-      res = await request(path, { method: 'PATCH', body: JSON.stringify(updates), timeout: 10000, headers: authHeaders() })
-    }
+    const res = await liveAuthOrGateway(`/api/orders/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(updates), timeout: 10000, headers: authHeaders() })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw Object.assign(new Error(data.error || 'فشل تحديث الطلب'), { status: res.status })
     return data

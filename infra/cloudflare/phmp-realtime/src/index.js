@@ -55,11 +55,18 @@ export default {
     // تمرير عنوان العميل الحقيقي (تحدید المعدل في الـDO)
     const headers = new Headers(request.headers)
     headers.set('x-phmp-client-ip', request.headers.get('cf-connecting-ip') || '')
+    // الجسم يُستهلك مرة واحدة هنا (قراءة كاملة) — يمنع أخطاء التدفقات
+    // المتروكة عند الردود المبكرة من الـDO (كتعذر التحقق 503)
+    let body
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      body = await request.arrayBuffer().catch(() => undefined)
+      if (body && body.byteLength === 0) body = undefined
+    }
     const hub = env.HUB.get(env.HUB.idFromName('global'))
     const res = await hub.fetch(new Request(url.toString(), {
       method: request.method,
       headers,
-      body: request.body,
+      body,
       redirect: 'manual',
     }))
     // إعادة الرد مع ترويسات CORS (استنساخ ترويسات الرد الأصلية)

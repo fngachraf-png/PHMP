@@ -183,8 +183,8 @@ class RealtimeClient {
       clearTimeout(failTimer)
       clearInterval(this.pingTimer)
       this.setStatus('offline')
-      // نقطة الاتصال السحابية لم تُصادقنا أبداً (غير منشورة/تعذر الوصول):
-      // علّمها معطلة مؤقتاً وبدّل للبوابة فوراً بلا انتظار التراجع الأسي
+      // نقطة الاتصال السحابية لم تُصادقنا أبداً (غير منشورة/تعذر وصول/تعذر
+      // تحقق — 4005): بدّل للبوابة فوراً بلا انتظار التراجع الأسي
       if (this.useLive && !this.welcomed) {
         this.liveDownUntil = Date.now() + LIVE_RETRY_AFTER
         this.attempt = 0

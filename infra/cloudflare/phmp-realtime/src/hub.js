@@ -80,6 +80,8 @@ export class RealtimeHub {
   // 1) إن ضُبط JWT_SECRET: تحقق محلي فوري (بلا اعتماد على أي خادم).
   // 2) وإلا: تحقق عبر خادم الهاتف (VPC) مع تخزين مؤقت لهوية الرمز (هاش
   //    الرمز فقط — لا يُخزَّن الرمز نفسه) حتى انتهائه.
+  // النتيجة: مستخدم | null (رمز غير صالح) | 'unavailable' (تعذر التحقق —
+  // كالسر غير مضبوط والهاتف نائم/بنسخة قديمة؛ لا يُحسب خطأ المستخدم).
   async verifyStaff(request) {
     const header = request.headers.get('Authorization') || ''
     const token = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
@@ -89,39 +91,15 @@ export class RealtimeHub {
       if (!payload || !payload.id) return null
       return { id: payload.id, name: payload.name || 'موظف', role: payload.role || 'cashier', pharmacyId: payload.pharmacyId || null }
     }
-    const cacheKey = `ac:${await sha256Hex(token)}`
-    const cached = await this.state.storage.get(cacheKey)
-    if (cached) {
-      if (cached.exp && cached.exp < Date.now()) { await this.state.storage.delete(cacheKey); return null }
-      return cached.identity
-    }
-    try {
-      const target = new URL('http://127.0.0.1:3001/api/auth/verify')
-      const res = await this.env.PHMP.fetch(new Request(target.toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      }))
-      if (!res.ok) return null
-      const data = await res.json()
-      if (!data?.ok || !data?.user?.id) return null
-      const identity = {
-        id: data.user.id, name: data.user.name || 'موظف',
-        role: STAFF_ROLE_OK(data.user.role) ? data.user.role : 'cashier',
-        pharmacyId: data.user.pharmacyId || null,
+    const result = await this.verifyTokenViaPhone(token)
+    if (result?.payload) {
+      return {
+        id: result.payload.id, name: result.payload.name || 'موظف',
+        role: STAFF_ROLE_OK(result.payload.role) ? result.payload.role : 'cashier',
+        pharmacyId: result.payload.pharmacyId || null,
       }
-      // انتهاء الصلاحية: من الرمز إن وُجد (قراءة غير موثقة للتسجيل فقط —
-      // التحقق نفسه تم على الخادم) وإلا 30 دقيقة
-      let exp = Date.now() + 30 * 60 * 1000
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
-        if (payload?.exp) exp = Math.min(exp, payload.exp * 1000)
-      } catch { /* تجاهل */ }
-      await this.state.storage.put(cacheKey, { identity, exp })
-      return identity
-    } catch {
-      return null
     }
+    return result?.invalid ? null : 'unavailable'
   }
 
   // ===== لائحة الصيدليات (تحقق من وجود صيدلية الطلب) =====
@@ -263,6 +241,7 @@ export class RealtimeHub {
   // ===== قائمة الطلبات (موظفون — نفس قواعد رؤية خادم الهاتف) =====
   async restListOrders(request, url) {
     const user = await this.verifyStaff(request)
+    if (user === 'unavailable') return jsonResponse({ error: 'verify_unavailable' }, 503)
     if (!user) return jsonResponse({ error: 'مصادقة مطلوبة' }, 401)
     let pharmacyId = strField(url.searchParams.get('pharmacyId'), 40)
     const isSuper = user.role === 'super_admin'
@@ -311,6 +290,7 @@ export class RealtimeHub {
   // ===== تحديث طلب (موظفون) =====
   async restUpdateOrder(request, orderId) {
     const user = await this.verifyStaff(request)
+    if (user === 'unavailable') return jsonResponse({ error: 'verify_unavailable' }, 503)
     if (!user) return jsonResponse({ error: 'مصادقة مطلوبة' }, 401)
     const envelope = await this.state.storage.get(`o:${orderId}`)
     if (!envelope) return jsonResponse({ error: 'الطلب غير موجود' }, 404)
@@ -380,6 +360,7 @@ export class RealtimeHub {
   // سحب: GET /api/orders/sync?since=ISO (موظف موثق — يوقّع الخادم رمز خدمة)
   async restSyncPull(request, url) {
     const user = await this.verifyStaff(request)
+    if (user === 'unavailable') return jsonResponse({ error: 'verify_unavailable' }, 503)
     if (!user || user.role !== 'super_admin') return jsonResponse({ error: 'مصادقة مطلوبة' }, 401)
     const since = strField(url.searchParams.get('since'), 40)
     const options = { prefix: 'ou:', limit: SYNC_PAGE_MAX }
@@ -394,6 +375,7 @@ export class RealtimeHub {
   // المصدران متطابقين (idempotent: الأحدث updatedAt فقط يفوز)
   async restSyncPush(request) {
     const user = await this.verifyStaff(request)
+    if (user === 'unavailable') return jsonResponse({ error: 'verify_unavailable' }, 503)
     if (!user || user.role !== 'super_admin') return jsonResponse({ error: 'مصادقة مطلوبة' }, 401)
     let body
     try { body = await request.json() } catch { return jsonResponse({ error: 'طلب غير صالح' }, 400) }
@@ -602,11 +584,21 @@ export class RealtimeHub {
     if (msg.type === 'auth') {
       let identity = null
       if (msg.token) {
-        const payload = this.env.JWT_SECRET
-          ? await verifyJwtHS256(msg.token, this.env.JWT_SECRET)
-          : await this.verifyTokenViaPhone(msg.token)
-        if (payload?.id) {
+        let result
+        if (this.env.JWT_SECRET) {
+          const payload = await verifyJwtHS256(msg.token, this.env.JWT_SECRET)
+          result = payload ? { payload } : { invalid: true }
+        } else {
+          result = await this.verifyTokenViaPhone(msg.token)
+        }
+        if (result?.payload) {
+          const payload = result.payload
           identity = { kind: 'staff', userId: payload.id, name: payload.name || 'موظف', role: payload.role || 'cashier', pharmacyId: payload.pharmacyId || null, phone: '' }
+        } else if (result?.unavailable) {
+          // الطبقة السحابية لا تستطيع التحقق الآن (سر غير مضبوط + الهاتف
+          // نائم/قديم) — ليس خطأ المستخدم: رمز مميز 4005 كي تسقط الواجهة
+          // للبوابة بدل إنهاء جلسة موظف سليمة (4003 محجوز للرمز الفاسد)
+          return ws.close(4005, 'تعذر التحقق حالياً — القناة الاحتياطية')
         }
       }
       if (!identity && msg.guest && typeof msg.guest.name === 'string' && msg.guest.name.trim()) {
@@ -763,13 +755,13 @@ export class RealtimeHub {
     }
   }
 
-  // تحقق رمز عبر خادم الهاتف (VPC) — لاتصال WS حين لا سرّ محلياً
+  // تحقق رمز عبر خادم الهاتف (VPC) — يعيد {payload} أو {invalid} أو {unavailable}
   async verifyTokenViaPhone(token) {
     const cacheKey = `ac:${await sha256Hex(token)}`
     const cached = await this.state.storage.get(cacheKey)
     if (cached) {
-      if (cached.exp && cached.exp < Date.now()) { await this.state.storage.delete(cacheKey); return null }
-      return cached.payload
+      if (cached.exp && cached.exp < Date.now()) { await this.state.storage.delete(cacheKey); return { invalid: true } }
+      return { payload: cached.payload }
     }
     try {
       const res = await this.env.PHMP.fetch(new Request('http://127.0.0.1:3001/api/auth/verify', {
@@ -777,9 +769,13 @@ export class RealtimeHub {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       }))
-      if (!res.ok) return null
+      // الهاتف نائم أو بنسخة قديمة بلا نقطة التحقق: ليست مشكلة الرمز —
+      // نميّزها كي لا تُنهي الواجهة جلسة موظف سليمة (4005 بدل 4003)
+      if (res.status === 404 || res.status === 502 || res.status === 503) return { unavailable: true }
+      if (res.status === 401 || res.status === 403) return { invalid: true }
+      if (!res.ok) return { unavailable: true }
       const data = await res.json()
-      if (!data?.ok || !data?.user?.id) return null
+      if (!data?.ok || !data?.user?.id) return { invalid: true }
       const payload = { id: data.user.id, name: data.user.name, role: data.user.role, pharmacyId: data.user.pharmacyId || null }
       let exp = Date.now() + 30 * 60 * 1000
       try {
@@ -787,9 +783,9 @@ export class RealtimeHub {
         if (p?.exp) exp = Math.min(exp, p.exp * 1000)
       } catch { /* تجاهل */ }
       await this.state.storage.put(cacheKey, { payload, exp })
-      return payload
+      return { payload }
     } catch {
-      return null
+      return { unavailable: true }
     }
   }
 
