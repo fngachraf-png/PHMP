@@ -97,9 +97,14 @@ async function handleOcr(request, env, origin) {
     return new Response(JSON.stringify({ error: 'image_invalid' }), { status: 400, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
   }
   let lastError = ''
-  for (const model of [OCR_MODEL, OCR_FALLBACK_MODEL]) {
+  // لكل نموذج حدوده: llama-3.2 يقبل 1600 رمزاً وllava حدّه 1024
+  const chain = [
+    { model: OCR_MODEL, maxTokens: 1600 },
+    { model: OCR_FALLBACK_MODEL, maxTokens: 1024 },
+  ]
+  for (const { model, maxTokens } of chain) {
     try {
-      const result = await env.AI.run(model, { image: bytes, prompt: OCR_PROMPT, max_tokens: 1600 })
+      const result = await env.AI.run(model, { image: bytes, prompt: OCR_PROMPT, max_tokens: maxTokens })
       const raw = String(result?.description || result?.response || result?.answer || result?.message?.content || '')
       if (raw) {
         return new Response(JSON.stringify({ text: raw.slice(0, 12000), model }), { headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
