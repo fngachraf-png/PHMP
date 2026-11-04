@@ -60,7 +60,12 @@ const corsHeaders = (origin) => ({
 // ---------------------------------------------------------------------
 // استخراج بنود فاتورة/وصل مخزون من صورة (OCR بالرؤية) — الاستيراد الذكي
 // ---------------------------------------------------------------------
+// سلسلة نماذج: الأساسي llama-3.2-vision (يتطلب قبول ترخيص المجتمع مرة
+// واحدة من لوحة Cloudflare — Workers AI → Models → Llama 3.2 Vision →
+// I agree) وإلا يرد 5016؛ عندها احتياط تلقائي إلى llava-1.5-7b (بلا
+// ترخيص خاص) كي تعمل الخاصية فوراً وبلا انتظار إجراء المالك.
 const OCR_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct'
+const OCR_FALLBACK_MODEL = '@cf/llava-hf/llava-1.5-7b-hf'
 const OCR_MAX_IMAGE = 4 * 1024 * 1024 // 4MB بعد الترميز (الواجهة تضغط قبل الرفع)
 
 const OCR_PROMPT = `You are a precise data-extraction engine for a Moroccan pharmacy platform.
@@ -85,20 +90,27 @@ async function handleOcr(request, env, origin) {
   if (image.length > OCR_MAX_IMAGE) {
     return new Response(JSON.stringify({ error: 'image_too_large' }), { status: 413, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
   }
+  let bytes
   try {
-    const result = await env.AI.run(OCR_MODEL, {
-      image: [...new Uint8Array(await (await fetch(image)).arrayBuffer())],
-      prompt: OCR_PROMPT,
-      max_tokens: 1600,
-    })
-    const raw = String(result?.description || result?.response || result?.answer || result?.message?.content || '')
-    if (!raw) {
-      return new Response(JSON.stringify({ error: 'empty_reply' }), { status: 502, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
-    }
-    return new Response(JSON.stringify({ text: raw.slice(0, 12000), model: OCR_MODEL }), { headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
-  } catch (err) {
-    return new Response(JSON.stringify({ error: 'ai_error', detail: String(err?.message || err).slice(0, 200) }), { status: 502, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+    bytes = [...new Uint8Array(await (await fetch(image)).arrayBuffer())]
+  } catch {
+    return new Response(JSON.stringify({ error: 'image_invalid' }), { status: 400, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
   }
+  let lastError = ''
+  for (const model of [OCR_MODEL, OCR_FALLBACK_MODEL]) {
+    try {
+      const result = await env.AI.run(model, { image: bytes, prompt: OCR_PROMPT, max_tokens: 1600 })
+      const raw = String(result?.description || result?.response || result?.answer || result?.message?.content || '')
+      if (raw) {
+        return new Response(JSON.stringify({ text: raw.slice(0, 12000), model }), { headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+      }
+      lastError = 'empty_reply'
+    } catch (err) {
+      // 5016 = ترخيص llama-3.2 غير مقبول بعد → جرّب الاحتياطي بهدوء
+      lastError = String(err?.message || err).slice(0, 200)
+    }
+  }
+  return new Response(JSON.stringify({ error: 'ai_error', detail: lastError }), { status: 502, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
 }
 
 // ---------------------------------------------------------------------
