@@ -16,6 +16,30 @@ const API_URL_FAILS_KEY = 'pharmacare_api_url_fails'
 // النفق الدائم (Workers VPC → Cloudflare Tunnel → 127.0.0.1:3001)
 export const DEFAULT_API_URL = 'https://phmp-api.balbolghol-ai.workers.dev'
 
+// الطبقة السحابية الدائمة للاتصال الفوري والطلبات (Durable Object يعمل
+// على حافة Cloudflare على مدار الساعة) — لا تتأثر بجاهزية خادم الهاتف.
+// الواجهات الثلاث (كلاودفلير/ڤيرسيل/أندرويد) تلتقي هنا فتتشاطر الطلبات
+// والدردشة والمكالمات آنياً مهلا كان خادم المالك متصلاً أم لا.
+export const LIVE_API_URL = 'https://phmp-realtime.balbolghol-ai.workers.dev'
+const LIVE_URL_KEY = 'pharmacare_live_url'
+const LIVE_RETRY_AFTER = 2 * 60 * 1000 // إن غابت الطبقة: إعادة المحاولة بعد دقيقتين
+let liveDownUntil = 0
+
+export const getLiveUrl = () => {
+  try {
+    return localStorage.getItem(LIVE_URL_KEY)?.replace(/"/g, '') || LIVE_API_URL
+  } catch {
+    return LIVE_API_URL
+  }
+}
+
+export const setLiveUrl = (url) => {
+  try {
+    if (url) localStorage.setItem(LIVE_URL_KEY, JSON.stringify(url))
+    else localStorage.removeItem(LIVE_URL_KEY)
+  } catch { /* ignore */ }
+}
+
 export const getApiUrl = () => {
   try {
     return localStorage.getItem(API_URL_KEY)?.replace(/"/g, '') || DEFAULT_API_URL
@@ -84,6 +108,12 @@ const request = async (path, options = {}) => {
   }
 }
 
+// ترويسات المصادقة (JWT) — تُمرَّر كما هي للطبقة السحابية والبوابة معاً
+const authHeaders = () => {
+  const token = getAuthToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 // طلب مصادق بجلسة الموظف (Authorization: Bearer JWT)
 const authRequest = (path, options = {}) => {
   const token = getAuthToken()
@@ -91,6 +121,46 @@ const authRequest = (path, options = {}) => {
     ...options,
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) },
   })
+}
+
+// ===== طلب موجه للطبقة السحابية الدائمة مع احتياط البوابة =====
+// أخطاء الشبكة فقط (تعذر الوصول للطبقة السحابية) تُسقط للمسار القديم —
+// أما ردود HTTP الحقيقية (4xx/2xx) فتُمرّر كما هي: إنها نتيجة الخادم نفسه.
+async function liveRequest(path, options = {}) {
+  if (Date.now() < liveDownUntil) {
+    const err = new Error('live_unreachable')
+    err.networkError = true
+    throw err
+  }
+  const url = `${getLiveUrl()}${path}`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), options.timeout || 8000)
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    return res
+  } catch (err) {
+    clearTimeout(timeout)
+    liveDownUntil = Date.now() + LIVE_RETRY_AFTER
+    const wrapped = new Error('live_unreachable')
+    wrapped.networkError = true
+    wrapped.cause = err
+    throw wrapped
+  }
+}
+
+// طلب طبقة سحابية مع سقوط تلقائي للبوابة (خادم المالك) عند تعذر الوصول
+async function liveOrGateway(path, options = {}) {
+  try {
+    return await liveRequest(path, options)
+  } catch (err) {
+    if (!err?.networkError) throw err
+    return request(path, options)
+  }
 }
 
 export const api = {
@@ -253,9 +323,12 @@ export const api = {
   },
 
   // ===== الطلبات المباشرة (مزامنة عبر الواجهات: Pages/Vercel/أندرويد) =====
-  // تُحفظ على خادم المالك (SQLite) وتبث فورياً — تكليف صريح من المالك v2.1.0.
+  // المصدر الموحّد: الطبقة السحابية الدائمة (Durable Object على حساب المالك)
+  // — تُخزَّن الطلبات هناك وتبث فورياً للجميع، ويحافظ خادم المالك على نسخة
+  // SQLite تاريخية عبر مرآة اتجاهين (تكليف المالك v2.3.0 بعد قياس نقطة
+  // الفشل الوحيدة في v2.1/v2.2: انقطاع خادم الهاتف كان يوقف كل شيء).
   async createOrder(order) {
-    const res = await request('/api/orders', {
+    const res = await liveOrGateway('/api/orders', {
       method: 'POST',
       body: JSON.stringify(order),
       timeout: 10000,
@@ -271,19 +344,29 @@ export const api = {
     if (since) qs.set('since', since)
     if (limit) qs.set('limit', String(limit))
     if (pharmacyId) qs.set('pharmacyId', pharmacyId)
-    const res = await authRequest(`/api/orders${qs.toString() ? '?' + qs.toString() : ''}`, { timeout: 10000 })
+    const path = `/api/orders${qs.toString() ? '?' + qs.toString() : ''}`
+    let res
+    try {
+      res = await liveRequest(path, { timeout: 10000, headers: authHeaders() })
+    } catch (err) {
+      if (!err?.networkError) throw err
+      res = await request(path, { timeout: 10000, headers: authHeaders() })
+    }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw Object.assign(new Error(data.error || 'فشل جلب الطلبات'), { status: res.status })
     return Array.isArray(data) ? data : []
   },
 
-  // تحديث حالة الطلب على الخادم (يبثها فورياً لكل الأجهزة)
+  // تحديث حالة الطلب (يبثها فورياً لكل الأجهزة)
   async updateOrderRemote(id, updates) {
-    const res = await authRequest(`/api/orders/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(updates),
-      timeout: 10000,
-    })
+    const path = `/api/orders/${encodeURIComponent(id)}`
+    let res
+    try {
+      res = await liveRequest(path, { method: 'PATCH', body: JSON.stringify(updates), timeout: 10000, headers: authHeaders() })
+    } catch (err) {
+      if (!err?.networkError) throw err
+      res = await request(path, { method: 'PATCH', body: JSON.stringify(updates), timeout: 10000, headers: authHeaders() })
+    }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw Object.assign(new Error(data.error || 'فشل تحديث الطلب'), { status: res.status })
     return data
@@ -291,11 +374,14 @@ export const api = {
 
   // إلغاء طلب من طرف الزبون (يتحقق الخادم من هاتف صاحب الطلب)
   async cancelOrderRemote(id, phone) {
-    const res = await request(`/api/orders/${encodeURIComponent(id)}/cancel`, {
-      method: 'POST',
-      body: JSON.stringify({ phone }),
-      timeout: 10000,
-    })
+    const path = `/api/orders/${encodeURIComponent(id)}/cancel`
+    let res
+    try {
+      res = await liveRequest(path, { method: 'POST', body: JSON.stringify({ phone }), timeout: 10000 })
+    } catch (err) {
+      if (!err?.networkError) throw err
+      res = await request(path, { method: 'POST', body: JSON.stringify({ phone }), timeout: 10000 })
+    }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw Object.assign(new Error(data.error || 'فشل إلغاء الطلب'), { status: res.status })
     return data
@@ -305,7 +391,14 @@ export const api = {
   async trackOrders(phone) {
     if (!phone) return []
     const qs = new URLSearchParams({ phone: String(phone) })
-    const res = await request(`/api/orders/track?${qs.toString()}`, { timeout: 8000 })
+    const path = `/api/orders/track?${qs.toString()}`
+    let res
+    try {
+      res = await liveRequest(path, { timeout: 8000 })
+    } catch (err) {
+      if (!err?.networkError) throw err
+      res = await request(path, { timeout: 8000 })
+    }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw Object.assign(new Error(data.error || 'فشل تتبع الطلبات'), { status: res.status })
     return Array.isArray(data) ? data : []

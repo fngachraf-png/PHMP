@@ -1,6 +1,6 @@
 // Pharmacy Management Platform PHMP - Service Worker
 // Strategy: Network-first for HTML, Cache-first for assets
-const CACHE_NAME = 'phmp-v8'
+const CACHE_NAME = 'phmp-v9'
 const STATIC_CACHE = 'phmp-static-v6'
 
 const STATIC_ASSETS = [

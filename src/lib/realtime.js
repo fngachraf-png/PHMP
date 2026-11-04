@@ -2,18 +2,22 @@
 // PHMP — عميل الاتصال الفوري (WebSocket + احتياط BroadcastChannel)
 // ---------------------------------------------------------------------
 // مزامنة الرسائل والمكالمات بين الزبون والموظفين عبر الأجهزة:
-//  - الوضع الأمثل: WebSocket إلى خادم المنصة المحلي (عبر النفق الدائم)
-//    — التراسل والمكالمات تعمل بين أي جهازين (هاتف ↔ حاسوب).
-//  - الوضع الاحتياطي: BroadcastChannel (نفس المتصفح) عبر directLink —
-//    يبقى الاتصال المباشر محلياً عند غياب الخادم.
+//  - الوضع الأمثل: WebSocket إلى الطبقة السحابية الدائمة phmp-realtime
+//    (Durable Object على حافة Cloudflare — يعمل دائماً حتى لو نام خادم
+//    المالك خلف النفق) — التراسل والمكالمات والطلبات بين أي جهازين.
+//  - الاحتياطي 1: بوابة خادم المالك (النفق الدائم) عند غياب الطبقة
+//    السحابية، مع إعادة تفضيلها دورياً (شفاف — نفس البروتوكول).
+//  - الاحتياطي 2: BroadcastChannel (نفس المتصفح) عبر directLink —
+//    يبقى الاتصال المباشر محلياً عند غياب النقطتين.
 // لا تُخزَّن الرسائل في أي مكان: تُستهلك مباشرة في الجلسة (قاعدة المالك).
 // =====================================================================
-import { getApiUrl } from './api'
+import { getApiUrl, getLiveUrl } from './api'
 import { directLink } from './directLink'
 
 const RECONNECT_BASE = 1000
 const RECONNECT_MAX = 20000
 const PING_EVERY = 25000
+const LIVE_RETRY_AFTER = 3 * 60 * 1000 // بعد فشل الطبقة السحابية: تجربتها مجدداً بعد 3 دقائق
 
 class RealtimeClient {
   constructor() {
@@ -116,15 +120,26 @@ class RealtimeClient {
   open() {
     if (this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) return
     this.setStatus(this.attempt === 0 ? 'connecting' : 'offline')
+    // اختيار نقطة الاتصال: الطبقة السحابية الدائمة أولاً؛ وعند تعذرها
+    // (تعذر شبكي/نشر لاحق) نستعمل بوابة خادم المالك ونعيد تفضيل السحابية
+    // بعد مهلة — التبديل شفاف: نفس البروتوكول على النقطتين.
+    this.useLive = Date.now() >= (this.liveDownUntil || 0)
+    let base
+    try {
+      base = this.useLive ? getLiveUrl() : getApiUrl()
+    } catch {
+      this.scheduleReconnect(); return
+    }
     let url
     try {
-      url = getApiUrl().replace(/^http/, 'ws') + '/ws'
+      url = base.replace(/^http/, 'ws') + '/ws'
     } catch {
       this.scheduleReconnect(); return
     }
     let ws
     try { ws = new WebSocket(url) } catch { this.scheduleReconnect(); return }
     this.ws = ws
+    this.welcomed = false
 
     const failTimer = setTimeout(() => {
       if (ws.readyState !== 1) { try { ws.close() } catch { /* تجاهل */ } }
@@ -143,6 +158,8 @@ class RealtimeClient {
       try { msg = JSON.parse(event.data) } catch { return }
       if (msg.type === 'welcome') {
         this.attempt = 0
+        this.welcomed = true
+        if (this.useLive) this.liveDownUntil = 0 // الطبقة السحابية حية
         this.setStatus('online')
         // إعادة الانضمام للغرف والمراقبة بعد انقطاع
         this.roomNames.forEach((room) => this.send({ type: 'join', room }))
@@ -166,6 +183,14 @@ class RealtimeClient {
       clearTimeout(failTimer)
       clearInterval(this.pingTimer)
       this.setStatus('offline')
+      // نقطة الاتصال السحابية لم تُصادقنا أبداً (غير منشورة/تعذر الوصول):
+      // علّمها معطلة مؤقتاً وبدّل للبوابة فوراً بلا انتظار التراجع الأسي
+      if (this.useLive && !this.welcomed) {
+        this.liveDownUntil = Date.now() + LIVE_RETRY_AFTER
+        this.attempt = 0
+        if (!this.manualClose) this.open()
+        return
+      }
       // 4003 = مصادقة غير صالحة (رمز JWT منتهٍ أو حساب موقوف): لا إعادة اتصال،
       // بل إشعار صريح للواجهة كي تنهي الجلسة بأناقة بدل البقاء «ظاهرياً متصلاً».
       if (event.code === 4003) {

@@ -246,6 +246,26 @@ app.post('/api/auth/login', async (req, res) => {
   }
 })
 
+// ===== تحقق رمز JWT (تستدعيه الطبقة السحابية phmp-realtime عبر VPC) =====
+// يعيد هوية الموظف مع فحص حي من قاعدة البيانات (الدور/التوقف يسريان فوراً).
+// يستعمل عند غياب سر JWT_SECRET على الـWorker — والنتيجة تُخزَّن مؤقتاً عنده
+// حتى انتهاء الرمز، فيبقى الاتصال الفوري حياً حتى أثناء نوم هذا الخادم.
+app.post('/api/auth/verify', (req, res) => {
+  const token = req.body?.token
+  if (typeof token !== 'string' || !token) return res.status(400).json({ ok: false, error: 'رمز مفقود' })
+  try {
+    const payload = jwt.verify(token, JWT_SECRET)
+    const fresh = db.prepare('SELECT role, active, pharmacy_id FROM users WHERE id = ?').get(payload.id)
+    if (!fresh || !fresh.active) return res.status(401).json({ ok: false, error: 'الحساب موقوف أو محذوف' })
+    res.json({
+      ok: true,
+      user: { id: payload.id, name: payload.name || 'موظف', role: fresh.role, pharmacyId: fresh.pharmacy_id || null },
+    })
+  } catch {
+    res.status(401).json({ ok: false, error: 'رمز غير صالح' })
+  }
+})
+
 // ===== المستخدمون (إدارة - أدمن وسوبر أدمين) =====
 app.get('/api/users', authenticate, requireRole('super_admin', 'admin'), (req, res) => {
   const rows = req.user.role === 'super_admin'
@@ -499,6 +519,7 @@ app.post('/api/orders', (req, res) => {
   full.updatedAt = now
   audit(req, 'order.create', { id, pharmacyId, customer: customer.name, phone: customer.phone, items: items.length, total })
   realtimeRT.broadcastOrder(full, 'new')
+  queueLivePush(full) // رفع غير محجوب للطبقة السحابية الدائمة (مرآة الاتجاهين)
   res.status(201).json({ ok: true, id, updatedAt: now })
 })
 
@@ -859,6 +880,125 @@ const realtimeRT = setupRealtime(server, {
   },
   log: (m) => console.log(m),
 })
+
+// =====================================================================
+// ===== مرآة الطلبات مع الطبقة السحابية الدائمة (phmp-realtime) =====
+// ---------------------------------------------------------------------
+// الواجهات الثلاث تقرأ الطلبات من الطبقة السحابية الدائمة (DO على حساب
+// المالك) كي لا تنقطع المزامنة أبداً — وهذا الخادم يحافظ على نسخة SQLite
+// التاريخية (قاعدة المالك 8) عبر مزامنة اتجاهين أفضل جهد:
+//   • سحب: كل طلب ظهر سحابياً (أُنشئ أثناء نوم هذا الخادم) يُدرج هنا.
+//   • دفع: كل طلب وصل عبر المسار الاحتياطي (هذه البوابة) يُرفع سحابياً.
+// إشارة الخدمة: JWT قصير العمر يوقّعه هذا الخادم بنفس السر — الطبقة
+// السحابية تتحقق منه محلياً (JWT_SECRET عندها) أو ترجع لهذا الخادم.
+// =====================================================================
+const LIVE_SYNC_URL = (process.env.PHMP_LIVE_SYNC_URL || 'https://phmp-realtime.balbolghol-ai.workers.dev').replace(/\/+$/, '')
+const LIVE_SYNC_ENABLED = process.env.PHMP_LIVE_SYNC_ENABLED !== '0'
+const LIVE_SYNC_INTERVAL = 5 * 60 * 1000
+const LIVE_PUSH_QUEUE_MAX = 500
+
+const livePushQueue = []
+let livePushBusy = false
+
+const signServiceToken = () => jwt.sign(
+  { id: 'phmp-live-sync', name: 'مرآة SQLite', role: 'super_admin', pharmacyId: null },
+  JWT_SECRET,
+  { expiresIn: '5m' },
+)
+
+function queueLivePush(order) {
+  if (!LIVE_SYNC_ENABLED || !order?.id) return
+  // آخر نسخة فقط لكل طلب (التحديث الأحدث يستبدل الأقدم)
+  const idx = livePushQueue.findIndex((o) => o.id === order.id)
+  if (idx >= 0) livePushQueue.splice(idx, 1)
+  livePushQueue.push(order)
+  if (livePushQueue.length > LIVE_PUSH_QUEUE_MAX) livePushQueue.shift()
+  flushLivePush() // غير محجوب — فشلها يعيد المحاولة في الدورة التالية
+}
+
+async function flushLivePush() {
+  if (!LIVE_SYNC_ENABLED || livePushBusy || livePushQueue.length === 0) return
+  livePushBusy = true
+  try {
+    const batch = livePushQueue.splice(0, 100)
+    const res = await fetch(`${LIVE_SYNC_URL}/api/orders/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${signServiceToken()}` },
+      body: JSON.stringify({ orders: batch }),
+      signal: AbortSignal.timeout(20_000),
+    })
+    if (!res.ok) {
+      // فشل الرفع: أعِد الدفعة للطابور (تُرفع في الدورة التالية)
+      livePushQueue.unshift(...batch)
+      console.log(`🪞 مرآة الطلبات: رفض الرفع سحابياً (${res.status}) — سيعاد لاحقاً`)
+    }
+  } catch {
+    // الطبقة السحابية غير متاحة الآن — تبقى الدفعة بالطابور
+  } finally {
+    livePushBusy = false
+  }
+}
+
+async function pullFromLive() {
+  if (!LIVE_SYNC_ENABLED) return
+  try {
+    await flushLivePush()
+    const since = getMeta('live_sync_since') || ''
+    const res = await fetch(`${LIVE_SYNC_URL}/api/orders/sync${since ? `?since=${encodeURIComponent(since)}` : ''}`, {
+      headers: { Authorization: `Bearer ${signServiceToken()}` },
+      signal: AbortSignal.timeout(20_000),
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    const orders = Array.isArray(data?.orders) ? data.orders : []
+    let inserted = 0
+    let updated = 0
+    let maxUpdated = since
+    const insertOrder = db.prepare(`INSERT INTO orders (id, number, pharmacy_id, customer_name, customer_phone, status, total, item_count, data, created_at, updated_at)
+                                    VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+    const updateOrder = db.prepare(`UPDATE orders SET number = ?, customer_name = ?, customer_phone = ?, status = ?, total = ?, item_count = ?, data = ?, updated_at = ? WHERE id = ?`)
+    for (const order of orders) {
+      if (!order?.id || typeof order !== 'object') continue
+      const nowIso = String(order.updatedAt || '')
+      if (nowIso > maxUpdated) maxUpdated = nowIso
+      // القيد الأجنبي: صيدلية غير معروفة محلياً (طلبات بوسم غير موثق وقت غياب
+      // السجل) تُتجاوز الآن وتُسجَّل للمراجعة — لا نكسر المزامنة كلياً
+      const phOk = db.prepare('SELECT id FROM pharmacies WHERE id = ?').get(order.pharmacyId || '')
+      if (!phOk) continue
+      let serialized
+      try { serialized = JSON.stringify(order) } catch { continue }
+      const existing = db.prepare('SELECT id, updated_at FROM orders WHERE id = ?').get(order.id)
+      if (existing) {
+        if (String(existing.updated_at || '') >= nowIso) continue
+        updateOrder.run(order.number || `CMD-${order.id}`, order.customer?.name || 'زبون', order.customer?.phone || '',
+          order.status || 'pending', Number.isFinite(Number(order.total)) ? Number(order.total) : 0,
+          Array.isArray(order.items) ? order.items.length : 0, serialized, nowIso, order.id)
+        updated += 1
+      } else {
+        insertOrder.run(order.id, order.number || `CMD-${order.id}`, order.pharmacyId,
+          order.customer?.name || 'زبون', order.customer?.phone || '',
+          order.status || 'pending', Number.isFinite(Number(order.total)) ? Number(order.total) : 0,
+          Array.isArray(order.items) ? order.items.length : 0, serialized,
+          order.createdAt || nowIso, nowIso)
+        inserted += 1
+        // وصل طلب أُنشئ سحابياً أثناء نوم هذا الخادم: نبثه لعملاء WS المحليين
+        try { realtimeRT.broadcastOrder(order, 'new') } catch { /* تجاهل */ }
+      }
+    }
+    if (maxUpdated > (getMeta('live_sync_since') || '')) setMeta('live_sync_since', maxUpdated)
+    if (inserted || updated) {
+      console.log(`🪞 مرآة الطلبات: استُقدم ${inserted} جديد وحدّث ${updated} من الطبقة السحابية → ${LIVE_SYNC_URL}`)
+    }
+  } catch (err) {
+    console.log(`🪞 مرآة الطلبات: تعذّر السحب (${err.message || err}) — إعادة المحاولة في الدورة التالية`)
+  }
+}
+
+if (LIVE_SYNC_ENABLED) {
+  setTimeout(pullFromLive, 8_000).unref()                     // أول سحب بعد الإقلاع
+  setInterval(pullFromLive, LIVE_SYNC_INTERVAL).unref()       // ثم كل 5 دقائق
+  console.log(`🪞 مرآة الطلبات نشطة ↔ ${LIVE_SYNC_URL}`)
+}
 
 // إغلاق نظيف (يحافظ على سلامة WAL)
 for (const sig of ['SIGINT', 'SIGTERM']) {

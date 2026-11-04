@@ -2,6 +2,9 @@ import { useState, useMemo } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { exportToCSV, money } from '../lib/exportUtils'
 import { searchOfficialCatalog, reimbursementRate, OFFICIAL_CATALOG_SIZE, CNSS_LIST_COUNT } from '../lib/officialCatalog'
+import { roleHasPermission } from '../config/permissions'
+import StockImportModal from '../components/inventory/StockImportModal'
+import StockImportsPanel from '../components/inventory/StockImportsPanel'
 import {
   Plus, Search, Edit, Trash2, Filter, Package, AlertTriangle,
   Calendar, TrendingDown, Barcode, Pill, X, Save, Download,
@@ -9,7 +12,7 @@ import {
 } from 'lucide-react'
 
 const Inventory = () => {
-  const { t, isRTL, productsData, categories, addProduct, updateProduct, deleteProduct, loadMoreProducts, fullDrugDatabase , pickName, language} = useApp()
+  const { t, isRTL, productsData, categories, addProduct, updateProduct, deleteProduct, loadMoreProducts, fullDrugDatabase , pickName, language, currentUser, pendingImportsCount, stockImports} = useApp()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterCategory, setFilterCategory] = useState('all')
@@ -19,6 +22,7 @@ const Inventory = () => {
   // المنتقي الرسمي: بحث في اللائحة الرسمية الموحدة لتعبئة النموذج بنقرة
   const [catalogQuery, setCatalogQuery] = useState('')
   const [catalogResults, setCatalogResults] = useState([])
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '', nameEn: '', barcode: '', sku: '', manufacturer: '',
@@ -177,6 +181,17 @@ const Inventory = () => {
             <Plus className="w-4 h-4" />
             {t('addProduct')}
           </button>
+          {roleHasPermission(currentUser?.role, 'inventory.import') && (
+            <button onClick={() => setShowImportModal(true)} className="btn-secondary !border-violet-300 !text-violet-700 hover:!bg-violet-50 dark:!border-violet-700 dark:!text-violet-300 dark:hover:!bg-violet-900/20 relative">
+              <Sparkles className="w-4 h-4" />
+              {t('smartImport')}
+              {pendingImportsCount > 0 && (
+                <span className="absolute -top-1.5 -end-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold text-white bg-amber-500 rounded-full">
+                  {pendingImportsCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -212,6 +227,9 @@ const Inventory = () => {
             : `Data from official Moroccan Ministry of Health - ${fullDrugDatabase?.length || 0} approved drugs`}
         </span>
       </div>
+
+      {/* دفعات الاستيراد الذكي (قيد المصادقة + السجل) */}
+      {stockImports.length > 0 && <StockImportsPanel />}
 
       {/* Filters */}
       <div className="card p-4">
@@ -683,6 +701,9 @@ const Inventory = () => {
           </div>
         </div>
       )}
+
+      {/* نافذة الاستيراد الذكي */}
+      {showImportModal && <StockImportModal onClose={() => setShowImportModal(false)} />}
     </div>
   )
 }

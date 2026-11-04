@@ -160,4 +160,36 @@ export const getAssistantReply = async ({ question, history, language, role, dru
   return local ? { ...local, via: 'local' } : null
 }
 
+// ---------------------------------------------------------------------
+// OCR بالرؤية لصور الفواتير وأوصال الاستلام (خاصية الاستيراد الذكي)
+// ---------------------------------------------------------------------
+// يرفع صورة مضغوطة (data URL) إلى نقطة /ocr في Worker المساعد الذي يستدعي
+// نموذج رؤية مجانياً من Workers AI. يعيد النص الخام المستخرج — والتحليل
+// المنظم يجري محلياً عبر parseOcrOutput (stockImportParsers) كي يبقى
+// التصحيح اليدوي والمطابقة الرسمية تحت تحكم الواجهة.
+const OCR_TIMEOUT_MS = 45000 // نماذج الرؤية أبطأ من النصية — مهلة أوسع
+
+export const ocrInvoiceImage = async (imageDataUrl) => {
+  const url = getAssistantWorkerUrl()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), OCR_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${url}/ocr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({ image: imageDataUrl }),
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data || typeof data.text !== 'string') {
+      const err = new Error(data?.error || 'ocr_failed')
+      err.status = res.status
+      throw err
+    }
+    return data.text
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export { ASSISTANT_KB }

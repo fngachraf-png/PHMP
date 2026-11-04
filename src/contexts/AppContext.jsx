@@ -975,6 +975,125 @@ export const AppProvider = ({ children }) => {
     return ok
   }
 
+  // =====================================================================
+  // ===== دفعات استيراد المخزون (تكليف المالك v2.3.0) =====
+  // ---------------------------------------------------------------------
+  // إضافة أدوية للمخزون بشكل آلي من: اللائحة الرسمية / صورة فاتورة (OCR) /
+  // ملف Word-PDF-جدول رقمي — مع تصحيح يدوي كامل ثم **مصادقة الأدمن** قبل
+  // لمس المخزون. الدفعة قيد الانتظار بيانات تشغيلية عابرة (محلية كسجل
+  // التدقيق)؛ المصادقة تُطبّق نتائجها على المنتجات نفسها فتتزامن عبر
+  // القنوات القائمة (localStorage + syncToServer) دون مخطط جديد للخادم.
+  // =====================================================================
+  const [stockImports, setStockImports] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pharmacare_stockImports') || '[]') } catch { return [] }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('pharmacare_stockImports', JSON.stringify(stockImports.slice(0, 100))) } catch { /* تجاهل */ }
+  }, [stockImports])
+
+  // تقديم دفعة استيراد جديدة (موظف مخزون: أدمن/صيدلاني/مالك) — لا تُطبق بعد
+  const submitStockImport = (batch) => {
+    if (!batch || !Array.isArray(batch.rows) || batch.rows.length === 0) return null
+    const entry = {
+      id: `imp-${Date.now()}`,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser?.name || '—',
+      createdByRole: currentUser?.role || null,
+      pharmacyId: currentPharmacy?.id || currentUser?.pharmacyId || null,
+      ...batch,
+      rows: batch.rows.map((r) => ({
+        ...r,
+        // لا يُحفظ إلا حقول الأعمال — البيانات الخام المؤقتة تُهمل
+        _raw: undefined,
+      })),
+    }
+    setStockImports((prev) => [entry, ...prev].slice(0, 100))
+    logAudit('stock_import_submit', {
+      id: entry.id, source: entry.source, rows: entry.rows.length,
+      supplier: entry.supplierId || '', invoice: entry.invoiceNumber || '',
+    })
+    setNotifications(prev => [{
+      id: Date.now(),
+      title: t('stockImportSubmitted'),
+      message: `${entry.rows.length} ${t('itemsCountLabel') || ''}`,
+      time: new Date(),
+    }, ...prev].slice(0, 20))
+    return entry
+  }
+
+  // مصادقة الأدمن (حصراً): تطبيق الدفعة على المخزون فعلياً
+  // — صنف قائم: زيادة الكمية + تحديث الأسعار/الصلاحية إن وُجدت
+  // — صنف جديد: إنشاؤه بكميته كاملة
+  const approveStockImport = (id) => {
+    const batch = stockImports.find((b) => b.id === id)
+    if (!batch || batch.status !== 'pending') return { ok: false, error: 'not_pending' }
+    if (!hasPermission('inventory.approve')) return { ok: false, error: 'forbidden' }
+    let added = 0
+    let restocked = 0
+    for (const row of batch.rows) {
+      if (row.existingProductId) {
+        const existing = productsData.find((p) => p.id === row.existingProductId)
+        if (existing) {
+          updateProduct(existing.id, {
+            stock: Number(existing.stock || 0) + Number(row.quantity || 0),
+            ...(row.cost > 0 ? { cost: row.cost } : {}),
+            ...(row.price > 0 ? { price: row.price } : {}),
+            ...(row.expiry ? { expiry: row.expiry } : {}),
+            ...(row.batch ? { batch: row.batch } : {}),
+          })
+          restocked += 1
+          continue
+        }
+      }
+      addProduct({
+        name: row.name,
+        nameEn: row.nameEn || '',
+        barcode: row.barcode || '',
+        sku: row.barcode ? `MA-${row.barcode}` : '',
+        manufacturer: row.manufacturer || '',
+        category: row.category || 'other',
+        cost: Number(row.cost || 0),
+        price: Number(row.price || 0),
+        stock: Number(row.quantity || 0),
+        minStock: 10,
+        expiry: row.expiry || '',
+        batch: row.batch || '',
+        requiresPrescription: !!row.requiresPrescription,
+        dosage: row.dosage || '',
+        form: row.form || '',
+        presentation: row.presentation || '',
+        image: '💊',
+      })
+      added += 1
+    }
+    setStockImports((prev) => prev.map((b) => (b.id === id
+      ? { ...b, status: 'approved', reviewedBy: currentUser?.name || '—', reviewedAt: new Date().toISOString() }
+      : b)))
+    logAudit('stock_import_approve', { id, added, restocked, rows: batch.rows.length })
+    setNotifications(prev => [{
+      id: Date.now(),
+      title: t('stockImportApproved'),
+      message: `${t('stockImportNewItems') || ''}: ${added} · ${t('stockImportRestocked') || ''}: ${restocked}`,
+      time: new Date(),
+    }, ...prev].slice(0, 20))
+    return { ok: true, added, restocked }
+  }
+
+  // رفض الدفعة (أدمن) مع سبب — لا يُمس المخزون إطلاقاً
+  const rejectStockImport = (id, reason = '') => {
+    const batch = stockImports.find((b) => b.id === id)
+    if (!batch || batch.status !== 'pending') return { ok: false, error: 'not_pending' }
+    if (!hasPermission('inventory.approve')) return { ok: false, error: 'forbidden' }
+    setStockImports((prev) => prev.map((b) => (b.id === id
+      ? { ...b, status: 'rejected', rejectReason: String(reason || '').slice(0, 300), reviewedBy: currentUser?.name || '—', reviewedAt: new Date().toISOString() }
+      : b)))
+    logAudit('stock_import_reject', { id, reason: String(reason).slice(0, 120), rows: batch.rows.length })
+    return { ok: true }
+  }
+
+  const pendingImportsCount = useMemo(() => stockImports.filter((b) => b.status === 'pending').length, [stockImports])
+
   const value = {
     // State
     language, setLanguage,
@@ -1012,6 +1131,8 @@ export const AppProvider = ({ children }) => {
     currentCustomer, setCurrentCustomer,
     // الطلبات المباشرة
     ordersData, addOrder, updateOrder, cancelOrder, visibleOrders,
+    // دفعات استيراد المخزون (مصادقة الأدمن)
+    stockImports, submitStockImport, approveStockImport, rejectStockImport, pendingImportsCount,
     // Notifications
     addNotification: (notification) => {
       const newNotif = { ...notification, id: Date.now(), time: new Date() }

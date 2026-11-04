@@ -1,0 +1,28 @@
+# PHMP — طبقة الاتصال الفوري الدائمة (Worker + Durable Object)
+# العنوان الثابت: https://phmp-realtime.balbolghol-ai.workers.dev
+# الدور: ترحيل الدردشة وإشارات المكالمات (بلا تخزين) + تخزين الطلبات وبثها
+# للواجهات الثلاث على مدار الساعة — دون أي اعتماد على جاهزية خادم الهاتف.
+# المصادقة: JWT_SECRET (سر Worker — نفس قيمة server/.env على هاتف المالك)
+# إن لم يُضبط: تحقق عبر خادم الهاتف (رابط VPC) مع تخزين مؤقت للنتيجة.
+name = "phmp-realtime"
+main = "src/index.js"
+compatibility_date = "2026-10-28"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "RealtimeHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RealtimeHub"]
+
+# نفس نفق خادم المالك المستعمل في بوابة phmp-api (للتحقق من الرموز وجلب
+# لائحة الصيدليات عند غياب JWT_SECRET المحلي)
+[[vpc_services]]
+binding = "PHMP"
+service_id = "01a184a7-cc40-7a01-8dd9-a0f034b2b71e"
+remote = true
+
+[vars]
+PHMP_ALLOWED_ORIGINS = "https://phmp.pages.dev,https://phmplatform.vercel.app,https://pharmacare-pro-jade.vercel.app,https://phmp-download.pages.dev"

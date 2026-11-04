@@ -2,10 +2,14 @@
 // Worker «مساعد PHMP» — واجهة خادمية آمنة لنماذج Cloudflare Workers AI
 // ---------------------------------------------------------------------
 // المهام:
-//   POST /  → يستقبل {question, history, lang, role, context}
-//             ويستدعي نموذجاً مجانياً من Workers AI (افتراضياً
-//             @cf/meta/llama-3.1-8b-instruct-fast) بتعليمات صارمة،
-//             ثم يعيد {reply}.
+//   POST /      → يستقبل {question, history, lang, role, context}
+//                 ويستدعي نموذجاً مجانياً من Workers AI (افتراضياً
+//                 @cf/meta/llama-3.1-8b-instruct-fast) بتعليمات صارمة،
+//                 ثم يعيد {reply}.
+//   POST /ocr   → يستقبل {image} (صورة فاتورة/وصل مخزون — data URL)
+//                 ويستدعي نموذج رؤية (@cf/meta/llama-3.2-11b-vision-
+//                 instruct) لاستخراج بنود الأدوية بصيغة JSON منظم،
+//                 ثم يعيد {text, rows} — لخاصية الاستيراد الذكي للمخزون.
 //
 // الأمان:
 //   • المفاتيح (AI binding) خادمية — لا شيء حساس في حزمة الواجهة
@@ -52,6 +56,50 @@ const corsHeaders = (origin) => ({
   'Access-Control-Max-Age': '86400',
   'Vary': 'Origin',
 })
+
+// ---------------------------------------------------------------------
+// استخراج بنود فاتورة/وصل مخزون من صورة (OCR بالرؤية) — الاستيراد الذكي
+// ---------------------------------------------------------------------
+const OCR_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct'
+const OCR_MAX_IMAGE = 4 * 1024 * 1024 // 4MB بعد الترميز (الواجهة تضغط قبل الرفع)
+
+const OCR_PROMPT = `You are a precise data-extraction engine for a Moroccan pharmacy platform.
+Read the attached invoice / stock receipt image (Arabic, French or English).
+Extract ONLY product line items (medicines or pharmacy products). IGNORE: headers, totals, taxes (TVA), timbre, discounts, pharmacy/customer info, page numbers, footer notes.
+Return STRICT JSON — no markdown, no commentary — an array of objects:
+[{"name":"<product name as printed>","quantity":<integer>,"unitPrice":<number or null>,"total":<number or null>,"batch":"<lot/batch or empty>","expiry":"<dd/mm/yyyy or mm/yyyy or empty>","barcode":"<codebarre/CIP digits or empty>"}]
+Rules: keep original spelling of names; numbers use dot decimal; if a field is absent use null or empty string; never invent items.`
+
+async function handleOcr(request, env, origin) {
+  if (!env.AI) {
+    return new Response(JSON.stringify({ error: 'ai_binding_missing' }), { status: 500, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+  }
+  let body
+  try { body = await request.json() } catch {
+    return new Response(JSON.stringify({ error: 'invalid_json' }), { status: 400, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+  }
+  const image = body?.image
+  if (typeof image !== 'string' || !image.startsWith('data:image/')) {
+    return new Response(JSON.stringify({ error: 'image_required' }), { status: 400, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+  }
+  if (image.length > OCR_MAX_IMAGE) {
+    return new Response(JSON.stringify({ error: 'image_too_large' }), { status: 413, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+  }
+  try {
+    const result = await env.AI.run(OCR_MODEL, {
+      image: [...new Uint8Array(await (await fetch(image)).arrayBuffer())],
+      prompt: OCR_PROMPT,
+      max_tokens: 1600,
+    })
+    const raw = String(result?.description || result?.response || result?.answer || result?.message?.content || '')
+    if (!raw) {
+      return new Response(JSON.stringify({ error: 'empty_reply' }), { status: 502, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+    }
+    return new Response(JSON.stringify({ text: raw.slice(0, 12000), model: OCR_MODEL }), { headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+  } catch (err) {
+    return new Response(JSON.stringify({ error: 'ai_error', detail: String(err?.message || err).slice(0, 200) }), { status: 502, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+  }
+}
 
 // ---------------------------------------------------------------------
 // تعليمات النظام — قلب الانضباط المهني للمساعد
@@ -113,7 +161,18 @@ export default {
     }
 
     if (url.pathname === '/health') {
-      return new Response(JSON.stringify({ ok: true, model: env.AI_MODEL || '@cf/meta/llama-3.1-8b-instruct-fast' }), { headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+      return new Response(JSON.stringify({ ok: true, model: env.AI_MODEL || '@cf/meta/llama-3.1-8b-instruct-fast', ocr: OCR_MODEL }), { headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+    }
+
+    // استخراج بنود فاتورة من صورة (خاصية الاستيراد الذكي للمخزون)
+    if (url.pathname === '/ocr') {
+      if (request.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+      }
+      if (!isOriginAllowed(origin)) {
+        return new Response(JSON.stringify({ error: 'origin_not_allowed' }), { status: 403, headers: { ...JSON_HEADERS, ...corsHeaders(origin) } })
+      }
+      return handleOcr(request, env, origin)
     }
 
     if (request.method !== 'POST' || (url.pathname !== '/' && url.pathname !== '/ask')) {

@@ -69,6 +69,10 @@ export const PERMISSIONS = {
   // المخزون
   'inventory.view': [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.ACCOUNTANT, ROLES.PHARMACIST],
   'inventory.manage': [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.PHARMACIST],
+  // الاستيراد الذكي للمخزون: إعداد الدفعات (لائحة/صورة فاتورة/ملف) للصيدلاني
+  // والأدمن — والمصادقة النهائية قبل تطبيق المخزون للأدمن حصراً (تكليف المالك)
+  'inventory.import': [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.PHARMACIST],
+  'inventory.approve': [ROLES.SUPER_ADMIN, ROLES.ADMIN],
 
   // الوصفات الطبية
   'prescriptions.view': [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.ACCOUNTANT, ROLES.PHARMACIST],
