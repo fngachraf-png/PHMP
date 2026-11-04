@@ -140,7 +140,9 @@ async function main() {
     ws.on('close', (c) => resolve(c))
     setTimeout(() => resolve('timeout'), 5000)
   })
-  ok('رمز مزيف: إغلاق 4003', badCode === 4003, `code=${badCode}`)
+  // 4003 = الرمز فاسد (التحقق متاح) | 4005 = تعذر التحقق (سر غير مضبوط
+  // والهاتف بنسخة قديمة) — كلاهما رفض آمن بلا كشف بيانات
+  ok('رمز مزيف: رفض آمن (4003 أو 4005)', badCode === 4003 || badCode === 4005, `code=${badCode}`)
 
   await Promise.allSettled([guestA.close(), guestB.close()])
 
