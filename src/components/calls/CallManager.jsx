@@ -31,6 +31,9 @@ const ICE_SERVERS = [
   { urls: 'stun:stun1.l.google.com:19302' },
 ]
 
+// مهلة الرنين: مكالمة صادرة بلا ردّ تُلغى تلقائياً بهذا المُهلة (كانت ترنّ للأبد)
+const RING_TIMEOUT_MS = 45000
+
 const fmtDuration = (sec) => {
   const m = Math.floor(sec / 60)
   const s = sec % 60
@@ -60,6 +63,7 @@ const CallManager = () => {
       try { c.pc?.close() } catch { /* تجاهل */ }
       c.localStream?.getTracks()?.forEach((track) => { try { track.stop() } catch { /* تجاهل */ } })
       clearInterval(c.timer)
+      clearTimeout(c.ringTimeout)
     }
     sounds.ringStop()
     setCallState(null)
@@ -121,19 +125,41 @@ const CallManager = () => {
     const pc = createPeer(callId)
     localStream.getTracks().forEach((track) => pc.addTrack(track, localStream))
 
+    // مهلة الرنين: لا ردّ خلال 45 ثانية → إرسال إشارة الإلغاء تلقائياً
+    // للمستقبِلين (الخادم يرحّلها كأي إشارة مكالمة) + حالة «لا رد» مترجمة
+    const ringTimeout = setTimeout(() => {
+      const c = callRef.current
+      if (c?.callId === callId && c.phase === 'outgoing') {
+        realtime.sendCall({ action: 'cancel', callId, to: c.replyTo, reason: 'no_answer' })
+        sounds.ringStop()
+        sounds.callEnd()
+        setCallState((prev) => prev ? { ...prev, phase: 'ended', endReason: 'no_answer' } : prev)
+        setTimeout(() => { if (callRef.current?.phase === 'ended') teardown() }, 1600)
+      }
+    }, RING_TIMEOUT_MS)
+
     setCallState({
       phase: 'outgoing', callId, to, replyTo: to,
-      peerName, peerAvatar, media, pc, localStream, timer: null,
+      peerName, peerAvatar, media, pc, localStream, timer: null, ringTimeout,
     })
     sounds.outgoing()
     sounds.vibrate([60])
 
+    let offer
     try {
-      const offer = await pc.createOffer()
+      offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
-      realtime.sendCall({ action: 'offer', callId, to, media, sdp: offer, displayName })
     } catch {
       teardown()
+      return
+    }
+    // إرسال العرض: إن كان الخادم الفوري غير متاح (false) فخطأ فوري مترجم
+    // بدل رنين لا نهائي لا يصل أحداً — الاحتياط المحلي لا يغطي إشارات المكالمات
+    const sent = realtime.sendCall({ action: 'offer', callId, to, media, sdp: offer, displayName })
+    if (!sent) {
+      sounds.ringStop()
+      setCallState((prev) => prev ? { ...prev, phase: 'error', error: 'offline' } : prev)
+      setTimeout(() => { if (callRef.current?.phase === 'error') teardown() }, 3500)
     }
   }, [createPeer, setCallState, teardown])
 
@@ -160,8 +186,9 @@ const CallManager = () => {
         sounds.ringStart()
       }
 
-      // ---- رد بالقبول (عند المتصل) ----
+      // ---- رد بالقبول (عند المتصل) — تُلغى مهلة الرنين ----
       else if (msg.action === 'answer' && cur?.callId === msg.callId && cur.phase === 'outgoing') {
+        clearTimeout(cur.ringTimeout)
         try {
           await cur.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp))
           setCallState((prev) => prev ? { ...prev, phase: 'connecting' } : prev)
@@ -192,9 +219,17 @@ const CallManager = () => {
         setTimeout(() => { if (callRef.current?.phase === 'ended') teardown() }, 1000)
       }
 
-      // ---- إلغاء من المتصل قبل الرد ----
-      else if (msg.action === 'cancel' && cur?.callId === msg.callId && cur.phase === 'incoming') {
-        teardown()
+      // ---- إلغاء من الطرف الآخر: يعمل لدى المستقبِل (يوقف الرنين ويغلق)
+      // ولدى المتصل أيضاً (إيقاف رنانه وإظهار «أُلغيت») — كانت تُهمل عند المتصل ----
+      else if (msg.action === 'cancel' && cur?.callId === msg.callId) {
+        if (cur.phase === 'incoming') {
+          teardown()
+        } else if (cur.phase === 'outgoing') {
+          sounds.ringStop()
+          sounds.callEnd()
+          setCallState((prev) => prev ? { ...prev, phase: 'ended', endReason: msg.reason || 'cancelled' } : prev)
+          setTimeout(() => { if (callRef.current?.phase === 'ended') teardown() }, 1400)
+        }
       }
     })
     return off
@@ -220,6 +255,10 @@ const CallManager = () => {
     const c = callRef.current
     if (c?.phase === 'incoming') {
       realtime.sendCall({ action: 'reject', callId: c.callId, to: c.replyTo })
+    } else if (c?.phase === 'outgoing') {
+      // زر الإنهاء أثناء الرنين يُلغي قبل الرد (cancel لا end) كي يُغلق
+      // الرنين لدى المستقبِلين فوراً — كانت الإشارة لا تُرسل أصلاً (خلل)
+      realtime.sendCall({ action: 'cancel', callId: c.callId, to: c.replyTo, reason: 'cancelled' })
     } else if (c && c.phase !== 'ended') {
       realtime.sendCall({ action: 'end', callId: c.callId, to: c.replyTo })
     }
@@ -274,13 +313,20 @@ const CallManager = () => {
     setCamOff(next)
   }
 
+  const endedLabel = () => {
+    if (call.endReason === 'busy') return t('callBusy')
+    if (call.endReason === 'no_answer') return t('callNoAnswer')
+    if (call.endReason === 'cancelled') return t('callCancelled')
+    return t('callEnded')
+  }
+
   const statusText = () => {
     if (call.phase === 'incoming') return t('callIncoming')
     if (call.phase === 'outgoing') return t('callRinging')
     if (call.phase === 'connecting') return t('callConnecting')
     if (call.phase === 'active') return fmtDuration(duration)
-    if (call.phase === 'ended') return call.endReason === 'busy' ? t('callBusy') : t('callEnded')
-    if (call.phase === 'error') return t('callFailed')
+    if (call.phase === 'ended') return endedLabel()
+    if (call.phase === 'error') return call.error === 'offline' ? t('callFailedOffline') : t('callFailed')
     return ''
   }
 
@@ -328,13 +374,13 @@ const CallManager = () => {
           {call.phase === 'error' && (
             <div className="mt-24 bg-red-500/15 border border-red-400/30 text-red-200 text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 max-w-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              {t('callMicBlocked')}
+              {call.error === 'offline' ? t('callFailedOffline') : t('callMicBlocked')}
             </div>
           )}
 
           {call.phase === 'ended' && (
             <div className="mt-4 bg-gray-800/80 text-gray-200 text-xs px-4 py-2 rounded-full">
-              {call.endReason === 'busy' ? t('callBusy') : t('callEnded')}
+              {endedLabel()}
             </div>
           )}
         </div>

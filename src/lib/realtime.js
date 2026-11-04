@@ -8,7 +8,7 @@
 //    يبقى الاتصال المباشر محلياً عند غياب الخادم.
 // لا تُخزَّن الرسائل في أي مكان: تُستهلك مباشرة في الجلسة (قاعدة المالك).
 // =====================================================================
-import { getApiUrl, getAuthToken } from './api'
+import { getApiUrl } from './api'
 import { directLink } from './directLink'
 
 const RECONNECT_BASE = 1000
@@ -63,27 +63,54 @@ class RealtimeClient {
   // للموظفين: connect({ token, userId, name, role }) — للزبناء: connect({ guest: { name, phone, pharmacyId } })
   // idempotent: إن كان الاتصال قائماً بنفس الهوية فلا يُعاد فتحه — يُستدعى بأمان
   // عند الإقلاع (استعادة الجلسة) وعند الدخول اليدوي معاً.
+  // تبديل الهوية (ضيف ↔ موظف أو مستخدم آخر): يُفكَّك المقبس القديم نظيفاً
+  // ويُفتح اتصال جديد بالمصادقة الجديدة — كان يُستبدل المرجع فقط فيبقى
+  // المقبس موثقاً بالهوية القديمة (خلل جذري v2.2.0).
   connect(auth) {
     if (typeof window === 'undefined') return
     const sameIdentity = (a, b) => {
       if (!a || !b) return false
-      if (a.token && b.token) return true                       // موظف بنفس الرمز المخزن
+      // موظفون: نفس المستخدم حصراً (كان أي رمزين يُعتبران نفس الهوية —
+      // فتبديل الحساب على نفس المتصفح لا يفتح اتصالاً بهوية الموظف الجديد)
+      if (a.token && b.token) return a.userId === b.userId
       if (a.guest && b.guest) return a.guest.name === b.guest.name && a.guest.pharmacyId === b.guest.pharmacyId
       return false
     }
     const live = this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)
     if (live && sameIdentity(this.auth, auth)) {
-      this.auth = auth // تحديث المرجع فقط (الرمز نفسه)
+      this.auth = auth // تحديث المرجع فقط (نفس الهوية — الرمز نفسه)
       return
     }
     this.auth = auth
+    // هوية مختلفة على مقبس قائم: تفكيك نظيف ثم اتصال جديد بالمصادقة الجديدة
+    if (live) this.teardownSocket()
     this.manualClose = false
+    this.attempt = 0
     if (auth?.token) {
       this.identity = { kind: 'staff', userId: auth.userId, name: auth.name, role: auth.role }
     } else if (auth?.guest) {
       this.identity = { kind: 'customer', name: auth.guest.name, role: 'customer' }
     }
     this.open()
+  }
+
+  // تفكيك نظيف للمقبس الحالي دون جدولة إعادة اتصال (لتبديل الهوية فقط):
+  // تُزال معالجاته كي لا تُغيّر الحالة ولا تُجدول إعادة اتصال بعد الإغلاق
+  teardownSocket() {
+    const old = this.ws
+    clearTimeout(this.reconnectTimer)
+    this.reconnectTimer = null
+    clearInterval(this.pingTimer)
+    this.pingTimer = null
+    this.queue = [] // رسائل الانتظار مرتبطة بالهوية السابقة — لا تُرسل بالجديدة
+    this.ws = null
+    if (old) {
+      old.onopen = null
+      old.onmessage = null
+      old.onclose = null
+      old.onerror = null
+      try { old.close() } catch { /* تجاهل */ }
+    }
   }
 
   open() {
@@ -199,7 +226,8 @@ class RealtimeClient {
     if (room) this.roomNames.add(room)
     const ok = this.sendOrQueue({ type: 'chat', room, to, text, displayName })
     if (ok) return 'server'
-    // احتياط: بث محلي (نفس المتصفح)
+    // احتياط: بث محلي (نفس المتصفح) — يُرسل اسم الغرفة كما هو؛ المستقبِل
+    // (DirectChat) يقبل المعرّف الخام وصيغة الغرفة معاً (order:/dm:)
     directLink.sendChat(room || `dm:${to}`, displayName || this.identity?.name || 'PHMP', this.identity?.role || 'user', text)
     return 'local'
   }

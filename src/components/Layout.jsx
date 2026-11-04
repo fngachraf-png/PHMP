@@ -7,6 +7,7 @@ import {
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { ROLE_INFO } from '../config/permissions'
+import { realtime } from '../lib/realtime'
 import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
 import SmartAvatar, { isImage } from './SmartAvatar'
@@ -16,6 +17,14 @@ import StaffComms from './calls/StaffComms'
 const Sidebar = ({ isOpen, onClose }) => {
   const { t, isRTL, currentPharmacy, currentUser, logout, language, hasPermission, isSuperAdmin, activePharmacyId, switchPharmacy, pharmaciesData, serverStatus, visibleOrders, pickName } = useApp()
   const location = useLocation()
+
+  // حالة الاتصال الفوري حية (WebSocket) — تعكس إصلاح تبديل الهوية: المقبس
+  // دوماً بهوية الجلسة الحالية، فالمؤشر يطابق الواقع لحظة بلحظة
+  const [wsStatus, setWsStatus] = useState(realtime.status)
+  useEffect(() => {
+    const off = realtime.onStatus(setWsStatus)
+    return off
+  }, [])
 
   // عدد الطلبات المعلقة (شارة القائمة الجانبية)
   const pendingOrdersCount = useMemo(
@@ -149,13 +158,23 @@ const Sidebar = ({ isOpen, onClose }) => {
           })}
         </nav>
 
-        {/* Server status */}
+        {/* Server status — حالة الخادم والاتصال الفوري (حية) */}
         <div className="px-4 pb-2">
-          <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${serverStatus.online ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-500'}`}>
-            {serverStatus.online ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+          <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${
+            wsStatus === 'online' ? 'bg-emerald-50 text-emerald-700'
+              : wsStatus === 'connecting' ? 'bg-amber-50 text-amber-700'
+              : 'bg-gray-50 text-gray-500'}`}>
+            {wsStatus === 'online' ? <Wifi className="w-3.5 h-3.5" />
+              : wsStatus === 'connecting' ? <Wifi className="w-3.5 h-3.5 animate-pulse" />
+              : <WifiOff className="w-3.5 h-3.5" />}
             <span>
-              {serverStatus.online ? t('serverOnline') : t('serverOffline')}
+              {wsStatus === 'online' ? t('serverOnline')
+                : wsStatus === 'connecting' ? t('serverConnecting')
+                : t('serverOffline')}
             </span>
+            {/* مصباح حالة الخادم REST (فحص الإقلاع) بجانب الفوري */}
+            <span className={`ms-auto w-2 h-2 rounded-full ${serverStatus.online ? 'bg-emerald-400' : 'bg-gray-300'}`}
+              title={serverStatus.online ? t('serverOnline') : t('serverOffline')} />
           </div>
         </div>
 

@@ -572,4 +572,16 @@ export const fr = {
   // ===== Géolocalisation (livraison) =====
   useMyLocation: 'Utiliser ma position actuelle (GPS)',
   locating: 'Localisation en cours…',
+
+  // ===== Connectivité et synchronisation (v2.2.0) =====
+  offlineBannerTitle: 'Non connecté au serveur temps réel',
+  offlineBannerBody: 'Rassurez-vous : vos commandes et messages sont enregistrés sur votre appareil et se synchroniseront automatiquement au retour de la connexion.',
+  orderSavedLocal: 'Commande enregistrée localement ; elle sera synchronisée avec le serveur automatiquement au retour de la connexion',
+  retryingSync: 'Impossible de mettre à jour sur le serveur ; la synchronisation sera relancée automatiquement au retour de la connexion',
+  callNoAnswer: 'Pas de réponse',
+  callCancelled: 'Appel annulé',
+  callFailedOffline: 'Impossible de démarrer l\'appel : aucune connexion au serveur temps réel ; réessayez au retour de la connexion',
+  serverConnecting: 'Reconnexion…',
+  serverUrlReset: 'URL du serveur réinitialisée automatiquement par défaut après des échecs répétés',
+  resetApiUrlBtn: 'Rétablir l\'URL par défaut',
 }

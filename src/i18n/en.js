@@ -572,4 +572,16 @@ export const en = {
   // ===== Geolocation (delivery) =====
   useMyLocation: 'Use my current location (GPS)',
   locating: 'Locating…',
+
+  // ===== Connectivity & sync (v2.2.0) =====
+  offlineBannerTitle: 'Not connected to the realtime server',
+  offlineBannerBody: 'No worries: your orders and messages are saved on your device and will sync automatically once the connection returns.',
+  orderSavedLocal: 'Order saved locally; it will sync to the server automatically when the connection returns',
+  retryingSync: 'Could not update on the server; sync will retry automatically when the connection returns',
+  callNoAnswer: 'No answer',
+  callCancelled: 'Call cancelled',
+  callFailedOffline: 'Could not start the call: no realtime server connection; try again once the connection returns',
+  serverConnecting: 'Reconnecting…',
+  serverUrlReset: 'Server URL automatically reset to default after repeated failures',
+  resetApiUrlBtn: 'Restore default URL',
 }

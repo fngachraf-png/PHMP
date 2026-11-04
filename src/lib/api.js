@@ -10,6 +10,8 @@
 
 const API_URL_KEY = 'pharmacare_api_url'
 const API_KEY_STORAGE = 'pharmacare_api_key'
+// عدّاد إقلاعات فشل فيها الرابط المخصص (للشفاء التلقائي بعد 3 متتالية)
+const API_URL_FAILS_KEY = 'pharmacare_api_url_fails'
 
 // النفق الدائم (Workers VPC → Cloudflare Tunnel → 127.0.0.1:3001)
 export const DEFAULT_API_URL = 'https://phmp-api.balbolghol-ai.workers.dev'
@@ -100,6 +102,44 @@ export const api = {
     } catch {
       return false
     }
+  },
+
+  // ===== الشفاء التلقائي لرابط الخادم (إصلاح v2.2.0) =====
+  // رابط مخصص محفوظ محلياً (من إعدادات قديمة أو تجربة) قد يعلق المنصة في
+  // «وضع محلي» للأبد إن مات خادمه. عند الإقلاع: إن فشل الرابط المخصص
+  // 3 إقلاعات متتالية بينما الرابط الافتراضي (نفق المالك) يستجيب ← يُعاد
+  // للرابط الافتراضي تلقائياً وتُعاد الدالة { reset:true, from } كي تعرض
+  // الواجهة إشعاراً مترجماً. فشل الشبكة كلياً لا يُحتسب (لا حكم على الرابط).
+  async healApiUrl() {
+    const current = getApiUrl()
+    if (current === DEFAULT_API_URL) {
+      try { localStorage.removeItem(API_URL_FAILS_KEY) } catch { /* تجاهل */ }
+      return null
+    }
+    const customOk = await this.checkHealth()
+    if (customOk) {
+      try { localStorage.removeItem(API_URL_FAILS_KEY) } catch { /* تجاهل */ }
+      return null
+    }
+    // الرابط المخصص لا يستجيب: نتحقق أن الافتراضي سليم قبل أي حكم
+    let defaultOk = false
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 4000)
+      const res = await fetch(`${DEFAULT_API_URL}/api/health`, { signal: controller.signal })
+      clearTimeout(timer)
+      defaultOk = res.ok
+    } catch { defaultOk = false }
+    if (!defaultOk) return null // الشبكة/الخادمان معطلان — لا يُلمس الرابط
+    let fails = 1
+    try {
+      fails = (parseInt(localStorage.getItem(API_URL_FAILS_KEY), 10) || 0) + 1
+      localStorage.setItem(API_URL_FAILS_KEY, String(fails))
+    } catch { /* التخزين معطل — نكتفي بالعدّ في الذاكرة لهذا الإقلاع */ }
+    if (fails < 3) return null
+    try { localStorage.removeItem(API_URL_FAILS_KEY) } catch { /* تجاهل */ }
+    setApiUrl(DEFAULT_API_URL)
+    return { reset: true, from: current, to: DEFAULT_API_URL }
   },
 
   // تسجيل الدخول عبر الخادم (كلمات مرور مشفرة bcrypt + JWT)

@@ -20,7 +20,7 @@ import {
 // =====================================================================
 
 const DirectChat = ({
-  orderId,                 // غرفة الطلب (زبون ↔ موظفي الصيدلية)
+  orderId,                 // غرفة الطلب (زبون ↔ موظفي الصيدلية) — معرّف خام
   who,                     // اسم الطرف الحالي (يُعرض للطرف الآخر)
   role,                    // customer | cashier | pharmacist | admin | …
   counterpartLabel,        // تسمية الطرف الآخر للعرض
@@ -28,6 +28,7 @@ const DirectChat = ({
   peer,                    // { kind:'user', id, name, avatar? } — دردشة موظف↔موظف
   pharmacyId,              // صيدلية الطلب (لتوجيه مكالمة الزبون لموظفيها)
   enableCalls = true,      // أزرار المكالمات
+  room,                    // اسم غرفة صريح يتجاوز البناء التلقائي (مساعد PHMP)
 }) => {
   const { t, language } = useApp()
   const [messages, setMessages] = useState([]) // في الذاكرة فقط (ephemeral)
@@ -36,7 +37,8 @@ const DirectChat = ({
   const [connMode, setConnMode] = useState('offline') // server | local | offline
   const [locating, setLocating] = useState(false)
   const listRef = useRef(null)
-  const roomName = orderId ? `order:${orderId}` : (peer ? `dm:${peer.id}` : null)
+  // اسم الغرفة: صريح (غرف المساعد المُحصورة بصيدلية) أو مشتق من الطلب/الزميل
+  const roomName = room || (orderId ? `order:${orderId}` : (peer ? `dm:${peer.id}` : null))
   const callTarget = peer
     ? `user:${peer.id}`
     : (role === 'customer' || role === 'guest')
@@ -55,9 +57,14 @@ const DirectChat = ({
         const mineRoom = msg.room === roomName
         const mineDirect = !msg.room && peer && msg.fromId === peer.id
         if (viaServer && !mineRoom && !mineDirect) return
-        // احتياط BroadcastChannel: نفس منطق النسخة السابقة
+        // احتياط BroadcastChannel (نفس المتصفح): يقبل المعرّف الخام وصيغة
+        // الغرفة معاً — كان يُقارن order:<id> بمعرّف خام فتُهمَل الرسالة أبداً
         if (!viaServer) {
-          if (msg.orderId && msg.orderId !== orderId) return
+          const raw = msg.orderId
+          const mine = raw === orderId || raw === roomName ||
+            (orderId && raw === `order:${orderId}`) ||
+            (peer && (raw === `dm:${peer.id}` || raw === `user:${peer.id}`))
+          if (raw && !mine) return
         }
         setMessages((prev) => [...prev, {
           from: msg.from, role: msg.role || msg.fromRole,

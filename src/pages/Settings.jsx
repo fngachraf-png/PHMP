@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { ROLE_INFO } from '../config/permissions'
-import { setApiUrl, getApiUrl, setApiKey, getApiKey } from '../lib/api'
+import { setApiUrl, getApiUrl, setApiKey, getApiKey, DEFAULT_API_URL } from '../lib/api'
 import LogoUpload from '../components/LogoUpload'
 import SmartAvatar, { isImage } from '../components/SmartAvatar'
 import {
   Settings as SettingsIcon, Globe, Bell, Shield, Database,
   Building2, Users, Palette, Save, Mail, Phone, MapPin, FileText,
-  Sun, Moon, Trash2, Download, Upload, Plus, Pencil, Wifi, RefreshCw, Crown
+  Sun, Moon, Trash2, Download, Upload, Plus, Pencil, Wifi, RefreshCw, Crown, RotateCcw
 } from 'lucide-react'
 
 const Settings = () => {
@@ -362,7 +362,21 @@ const Settings = () => {
                   <button className="btn-secondary" onClick={() => { setApiUrl(apiUrlInput); window.location.reload() }}>
                     <Save className="w-4 h-4" />
                   </button>
+                  {/* استعادة الرابط الافتراضي (نفق المالك) — يفك عقدة رابط قديم عالق */}
+                  <button
+                    className="btn-secondary"
+                    title={DEFAULT_API_URL}
+                    onClick={() => { setApiUrlInput(DEFAULT_API_URL); setApiUrl(DEFAULT_API_URL); window.location.reload() }}>
+                    <RotateCcw className="w-4 h-4" /> {t('resetApiUrlBtn')}
+                  </button>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {language === 'ar'
+                    ? 'يتحقق الإقلاع تلقائياً: إن فشل رابط مخصص 3 مرات متتالية بينما الافتراضي سليم يُعاد إليه تلقائياً مع إشعار.'
+                    : language === 'fr'
+                      ? 'Au démarrage : une URL personnalisée qui échoue 3 fois de suite (alors que celle par défaut répond) est automatiquement rétablie avec notification.'
+                      : 'On startup: a custom URL failing 3 boots in a row (while the default responds) is auto-reset with a notification.'}
+                </p>
               </div>
               <div>
                 <label className="label">{language === 'ar' ? 'مفتاح API (للمزامنة والنسخ الاحتياطي)' : language === 'fr' ? 'Clé API (synchro et sauvegarde)' : 'API key (sync & backup)'}</label>

@@ -6,6 +6,7 @@ import { categories as moroccanCategories } from '../data/categories'
 import { roleHasPermission, ROLE_INFO } from '../config/permissions'
 import { api, getAuthToken } from '../lib/api'
 import { realtime } from '../lib/realtime'
+import { orderSyncQueue } from '../lib/orderSyncQueue'
 import sounds from '../lib/sounds'
 
 // Load top drugs by default, full database on demand
@@ -233,9 +234,23 @@ export const AppProvider = ({ children }) => {
   // فحص الخادم المحلي عند الإقلاع + تحديث قائمة الصيدليات من المصدر الموثوق
   // (نقطة عامة بلا جلسة): يضمن أن زبناء المتجر يطلبون من صيدليات قائمة فعلاً
   // على الخادم — وإلا فُشل حفظ الطلب لدى صيدلية حُذفت أو أُعيدت هيكلتها.
+  // الشفاء التلقائي أولاً: رابط مخصص فشل 3 إقلاعات متتالية والافتراضي سليم
+  // ← يُعاد للرابط الافتراضي مع إشعار مترجم (خلل روابط قديمة عالقة).
   useEffect(() => {
     let alive = true
-    api.checkHealth().then(async (online) => {
+    ;(async () => {
+      try {
+        const healed = await api.healApiUrl()
+        if (alive && healed?.reset) {
+          setNotifications((prev) => [{
+            id: Date.now(),
+            title: t('serverUrlReset'),
+            message: healed.from || '',
+            time: new Date(),
+          }, ...prev].slice(0, 20))
+        }
+      } catch { /* تجاهل — الفحص اختياري */ }
+      const online = await api.checkHealth()
       if (!alive) return
       setServerStatus((s) => ({ ...s, online }))
       if (!online) return
@@ -245,8 +260,9 @@ export const AppProvider = ({ children }) => {
           setPharmaciesData((prev) => (JSON.stringify(prev) === JSON.stringify(fresh) ? prev : fresh))
         }
       } catch { /* قائمة محلية سليمة كافية مؤقتاً */ }
-    }).catch(() => {})
+    })()
     return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // مرجع حي لقائمة الطلبات (تستعمله مزامنة الخلفية دون إعادة تسجيل مستمرة)
@@ -417,6 +433,62 @@ export const AppProvider = ({ children }) => {
     return () => { cancelled = true; off() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, currentCustomer?.phone])
+
+  // ===== استطلاع احتياطي عند غياب الاتصال الفوري (WebSocket) =====
+  // عندما لا يكون الاتصال الفوري متصلاً نستطلع REST دورياً: الموظف كل
+  // 45 ثانية (قائمة الطلبات) والزبون كل 60 ثانية (تتبع طلباته) — ويتوقف
+  // الاستطلاع فور عودة الاتصال الفوري، مع حماية من الاستطلاعات المتداخلة.
+  useEffect(() => {
+    let inFlight = false
+    let stopped = false
+    const poll = async () => {
+      if (stopped || inFlight || realtime.status === 'online') return
+      inFlight = true
+      try {
+        if (currentUser) {
+          const fresh = await api.fetchOrders({ limit: 200 })
+          if (!stopped && Array.isArray(fresh)) setOrdersData((prev) => mergeOrders(prev, fresh))
+        } else if (currentCustomer?.phone) {
+          const tracked = await api.trackOrders(currentCustomer.phone)
+          if (!stopped && Array.isArray(tracked)) setOrdersData((prev) => mergeOrders(prev, tracked))
+        }
+      } catch { /* الخادم غير متاح — المحلي كافٍ مؤقتاً */ }
+      finally { inFlight = false }
+    }
+    const iv = setInterval(poll, currentUser ? 45000 : 60000)
+    return () => { stopped = true; clearInterval(iv) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentCustomer?.phone])
+
+  // ===== تصريف طابور إعادة مزامنة الطلبات الفاشلة =====
+  // الطلبات التي فشل حفظها/تحديثها أثناء الانقطاع تُعاد تلقائياً فور عودة
+  // الاتصال الفوري، ودورياً (كل 60 ثانية) ما دام الطابور غير فارغ.
+  const flushOrderQueue = useCallback(async () => {
+    if (orderSyncQueue.size() === 0) return
+    let okCount = 0
+    try {
+      okCount = await orderSyncQueue.flush(
+        {
+          create: (o) => api.createOrder(o),
+          update: (id, updates) => api.updateOrderRemote(id, updates),
+        },
+        (entry) => {
+          // نجح إنشاء طلب كان محفوظاً محلياً — يُعلّم مُزامَناً ويُسحب من الطابور
+          if (entry.kind === 'create') {
+            setOrdersData((prev) => prev.map((x) => (x.id === entry.orderId ? { ...x, _synced: true, _unsynced: false } : x)))
+          }
+        },
+        () => { /* فشل مجدداً — يبقى في الطابور للمحاولة التالية */ },
+      )
+    } catch { /* تجاهل — يُعاد لاحقاً */ }
+    return okCount
+  }, [])
+
+  useEffect(() => {
+    const off = realtime.onStatus((s) => { if (s === 'online') flushOrderQueue() })
+    const iv = setInterval(() => { if (orderSyncQueue.size() > 0) flushOrderQueue() }, 60000)
+    return () => { off(); clearInterval(iv) }
+  }, [flushOrderQueue])
 
   // الترجمة مع سلسلة احتياطية (اللغة → العربية → المفتاح)
   const t = (key) => translations[language]?.[key] || translations.ar?.[key] || key
@@ -822,7 +894,18 @@ export const AppProvider = ({ children }) => {
         .then(() => {
           setOrdersData(prev => prev.map(o => (o.id === newOrder.id ? { ...o, _synced: true } : o)))
         })
-        .catch(() => { /* الخادم غير متاح — يُزامن تلقائياً عند عودة الاتصال */ })
+        .catch(() => {
+          // الخادم غير متاح: يبقى الطلب محلياً مُعلّماً _unsynced، مع إشعار
+          // واضح للمستخدم، ويُصفّف لإعادة المحاولة فور عودة الاتصال (أعلاه)
+          setOrdersData(prev => prev.map(o => (o.id === newOrder.id ? { ...o, _unsynced: true } : o)))
+          orderSyncQueue.add({ orderId: newOrder.id, kind: 'create', payload: newOrder })
+          setNotifications(prev => [{
+            id: Date.now(),
+            title: t('orderSavedLocal'),
+            message: `${newOrder.number || ''} · ${(newOrder.customer?.name || '').slice(0, 40)}`,
+            time: new Date(),
+          }, ...prev].slice(0, 20))
+        })
     }
     return newOrder
   }
@@ -837,7 +920,19 @@ export const AppProvider = ({ children }) => {
       // بث احتياطي محلي + حفظ على الخادم (يبثه لكل الأجهزة بما فيها الزبون)
       realtime.announceOrderUpdate(id, updated.status, { order: updated })
       if (currentUser) {
-        api.updateOrderRemote(id, updates).catch(() => { /* يُزامن لاحقاً */ })
+        api.updateOrderRemote(id, updates)
+          .then(() => { orderSyncQueue.remove(id) })
+          .catch(() => {
+            // تعذّر التحديث على الخادم: يبقى محلياً سليماً ويُصفّف لإعادة
+            // المحاولة عند عودة الاتصال (التحديث الأحدث يستبدل الأقدم)
+            orderSyncQueue.add({ orderId: id, kind: 'update', payload: updates })
+            setNotifications(prev => [{
+              id: Date.now(),
+              title: t('retryingSync'),
+              message: `${target.number || ''} · ${updates.status || ''}`,
+              time: new Date(),
+            }, ...prev].slice(0, 20))
+          })
       }
     }
     return updated

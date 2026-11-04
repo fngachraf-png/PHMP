@@ -12,7 +12,7 @@ import { realtime } from '../lib/realtime'
 import {
   Store, MapPin, Phone, Search, ShoppingCart, Trash2, Plus, Minus,
   ArrowRight, ArrowLeft, PackageSearch, ClipboardList, LogOut, X, BadgeCheck,
-  ShieldCheck, Truck, Lock, UserRound, Stethoscope as StethoscopeIcon
+  ShieldCheck, Truck, Lock, UserRound, Stethoscope as StethoscopeIcon, WifiOff
 } from 'lucide-react'
 
 // =====================================================================
@@ -52,6 +52,14 @@ const Shop = () => {
   const [myOrdersOpen, setMyOrdersOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [toast, setToast] = useState('')
+  // حالة الاتصال الفوري + لافتة انقطاع قابلة للإخفاء (تُعرض عند فقد الخادم)
+  const [connStatus, setConnStatus] = useState(realtime.status)
+  const [offlineDismissed, setOfflineDismissed] = useState(false)
+
+  useEffect(() => {
+    const off = realtime.onStatus(setConnStatus)
+    return off
+  }, [])
 
   // دعم رابط البحث المباشر ?q= (من بطاقات دواء «مساعد PHMP» وغيرها)
   const [searchParams] = useSearchParams()
@@ -393,7 +401,25 @@ const Shop = () => {
       {/* ===== المحتوى ===== */}
       {/* w-full إلزامية: داخل حاوية flex-col يمنع mx-auto التمدد فيتحول
           العرض إلى «حسب المحتوى» فيفيض شريط الفئات خارج الشاشة (خلل الفيض) */}
-      <main className="w-full max-w-6xl mx-auto p-4 pb-28 safe-bottom">
+      <main className="w-full max-w-6xl mx-auto p-4 pb-28 safe-bottom space-y-4">
+        {/* لافتة انقطاع الاتصال الفوري: طمأنة الزبون أن طلباته ورسائله
+            محفوظة محلياً وتُزامن تلقائياً — قابلة للإخفاء (خلل UX v2.2.0) */}
+        {pharmacyId && !offlineDismissed && connStatus === 'offline' && (
+          <div className="card p-3 flex items-center gap-3 border-amber-200 bg-amber-50 dark:bg-amber-900/30">
+            <span className="w-9 h-9 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+              <WifiOff className="w-4 h-4" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-amber-900 leading-snug">{t('offlineBannerTitle')}</p>
+              <p className="text-xs text-amber-700 leading-snug">{t('offlineBannerBody')}</p>
+            </div>
+            <button onClick={() => setOfflineDismissed(true)}
+              className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-100 transition-colors flex-shrink-0"
+              aria-label={t('close')} title={t('close')}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         {step === 'pharmacies' && renderPharmacies()}
         {step === 'browse' && renderBrowse()}
         {step === 'tracking' && renderTracking()}

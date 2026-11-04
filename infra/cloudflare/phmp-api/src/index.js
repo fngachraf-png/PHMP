@@ -37,9 +37,21 @@ const handler = {
         redirect: 'manual',
       }))
     } catch {
-      return new Response(
-        'PHMP Gateway: الخادم المحلي غير متاح حالياً (تحقق من النفق والخادم)',
-        { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8' } },
+      // الخادم المحلي خلف النفق غير متاح: ردّ JSON موحّد (بدل نص خام) مع
+      // ترويسات CORS كي تستطيع الواجهات قراءة الخطأ وعرضه — الأصل نفسه
+      // يُردّ إليه (بوابة تمرير: الأصل نفسه من سير التحقق لا من هنا)
+      const origin = request.headers.get('origin') || '*'
+      return Response.json(
+        { error: 'origin_unavailable' },
+        {
+          status: 503,
+          headers: {
+            'access-control-allow-origin': origin,
+            'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+            'access-control-allow-headers': 'Content-Type,Authorization,x-phmp-key,x-phmp-client-ip',
+            'vary': 'Origin',
+          },
+        },
       )
     }
   },

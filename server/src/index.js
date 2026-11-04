@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url'
 import { randomUUID, timingSafeEqual } from 'crypto'
 import { db, initSchema, setMeta, getMeta, DB_PATH } from './db.js'
 import { setupRealtime } from './realtime.js'
+import { makeOriginAllowed } from './origins.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -46,38 +47,10 @@ const app = express()
 app.disable('x-powered-by')
 app.use(express.json({ limit: '50mb' }))
 
-// ===== الأصول المسموحة (CORS) =====
-// أصول Capacitor (تطبيق أندرويد/iOS): WebView يحمّل الواجهة من https://localhost
-// (androidScheme: https) — بدون إدراجها هنا يحجب CORS كل طلبات الدخول من التطبيق
-// فيفشل تسجيل الدخول. آمنة: متصفحات الويب لا تستطيع انتحال ترويسة Origin،
-// وأصل localhost لا يصدر إلا من التطبيق المثبّت على جهاز المستخدم نفسه.
-const CAPACITOR_ORIGINS = [
-  'https://localhost',   // أندرويد (androidScheme: https — الافتراضي في Capacitor 6)
-  'http://localhost',    // إعدادات أندرويد القديمة (androidScheme: http)
-  'capacitor://localhost', // iOS (المخطط الافتراضي)
-  'ionic://localhost',   // توافق مع حزم Ionic القديمة
-]
-
-const ALLOWED_ORIGINS = (process.env.PHMP_ALLOWED_ORIGINS ||
-  'https://phmp.pages.dev,https://phmplatform.vercel.app,https://pharmacare-pro-jade.vercel.app')
-  .split(',').map((s) => s.trim()).filter(Boolean)
-
-const originAllowed = (origin) => {
-  if (!origin) return true // curl / تطبيق أصلي بلا Origin
-  if (ALLOWED_ORIGINS.includes(origin) || CAPACITOR_ORIGINS.includes(origin)) return true
-  try {
-    const host = new URL(origin).hostname
-    // معاينات Pages التابعة لنفس المشروع
-    if (host === 'phmp.pages.dev' || host.endsWith('.phmp.pages.dev')) return true
-    // معاينات Vercel الخاصة بمشروع PHMP فقط (وليس أي *.vercel.app)
-    if (host.endsWith('.vercel.app')) {
-      return host.startsWith('phmplatform-') || host.startsWith('pharmacare-pro-jade-')
-    }
-    return false
-  } catch {
-    return false
-  }
-}
+// ===== الأصول المسموحة (CORS) — وحدة مشتركة مع WebSocket =====
+// نفس دالة الفحص تُطبَّق على HTTP و WS (فحص Origin عند ترقية الاتصال) كي لا
+// يتفاوت القبول بين القناتين — راجع src/origins.js للتفاصيل والأصول.
+const originAllowed = makeOriginAllowed()
 
 app.use(cors({
   origin(origin, cb) { cb(null, originAllowed(origin)) },
@@ -198,6 +171,18 @@ const requireApiKey = (req, res, next) => {
 }
 
 // ===== الصحة =====
+// إصدار المنصة الفعلي من package.json (يُقرأ مرة واحدة عند الإقلاع — جذر
+// المستودع أولاً ثم حزمة الخادم) بدل قيمة ثابتة قديمة؛ dbVersion منفصل.
+const APP_VERSION = (() => {
+  for (const pkgPath of [path.join(__dirname, '..', '..', 'package.json'), path.join(__dirname, '..', 'package.json')]) {
+    try {
+      const v = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version
+      if (v) return v
+    } catch { /* تجاهل — نجرب التالي */ }
+  }
+  return '0.0.0'
+})()
+
 app.get('/api/health', (_req, res) => {
   let database = 'error'
   try {
@@ -208,7 +193,8 @@ app.get('/api/health', (_req, res) => {
     ok: database === 'ok',
     service: 'PHMP Local Server',
     database,
-    version: getMeta('db_version') || '1.0.0',
+    version: APP_VERSION,
+    dbVersion: getMeta('db_version') || '1.0.0',
     uptime: Math.round(process.uptime()),
     time: new Date().toISOString(),
   })
@@ -860,6 +846,9 @@ const server = app.listen(PORT, HOST, () => {
 // هذا الخادم يرحّل الرسائل وإشارات الاتصال في الذاكرة فقط. الطلبات وحدها
 // تُحفظ في SQLite وتُبث عبر broadcastOrder بعد كل حفظ (قاعدة 8 المحدَّثة).
 const realtimeRT = setupRealtime(server, {
+  // فحص أصل WebSocket: نفس قائمة CORS (راجع origins.js) — يرفض الأصل غير
+  // المسموح بالإغلاق 4403؛ الأصل الغائب مسموح (عملاء غير متصفح/اختبارات)
+  originAllowed,
   // تحقق حي من JWT: يعيد قراءة الدور والحالة من قاعدة البيانات — أي توقيف
   // أو تخفيض يسري فوراً على الاتصال الفوري أيضاً (لا ينتظر انتهاء الرمز).
   verifyJwt: (token) => {

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../../contexts/AppContext'
 import { directLink } from '../../lib/directLink'
+import { realtime } from '../../lib/realtime'
 import { analyzeMessage, toDrugCard } from '../../lib/assistantEngine'
 import { getAssistantReply, probeWorker } from '../../lib/assistantLLM'
 import DirectChat from '../DirectChat'
@@ -22,9 +23,17 @@ import {
 //   المباشر المستهلك فورياً — بلا أي تسجيل في خوادم المنصة
 // =====================================================================
 
-const ASSISTANT_CHAT_ID = 'phmp-assistant-direct'
+const ASSISTANT_ROOM_PREFIX = 'assistant:' // غرفة لكل صيدلية: assistant:<pharmacyId>
 const PRESENCE_INTERVAL = 20000
 const PRESENCE_TTL = 45000
+
+// صيدلية المتجر المختارة (زبون/ضيف) من تخزين الجلسة — يكتبها Shop.jsx
+const readShopPharmacy = () => {
+  try {
+    const v = JSON.parse(localStorage.getItem('pharmacare_shop_pharmacy') || 'null')
+    return typeof v === 'string' && v ? v : null
+  } catch { return null }
+}
 
 const ROLE_LABEL_KEY = {
   pharmacist: 'assistantRolePharmacist',
@@ -71,7 +80,7 @@ const DrugCardView = ({ drug, t }) => (
 )
 
 const PHMPAssistant = () => {
-  const { t, language, isRTL, currentUser, currentCustomer } = useApp()
+  const { t, language, isRTL, currentUser, currentCustomer, pharmaciesData, activePharmacyId } = useApp()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState('chat') // chat | escalate
   const [messages, setMessages] = useState([]) // {id, mine, text, drugs?, sourceKey?, escalate?}
@@ -83,24 +92,50 @@ const PHMPAssistant = () => {
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const idRef = useRef(1)
+  const [shopPharmacy, setShopPharmacy] = useState(readShopPharmacy)
+  const [lastAssistantRoom, setLastAssistantRoom] = useState(null) // آخر غرفة وصلها رسالة (سوبر أدمين)
 
   // الدور الحالي للمساعد: موظف / زبون مسجل / زبون عابر
   const audience = currentUser ? 'staff' : (currentCustomer ? 'customer' : 'guest')
   const displayName = currentUser?.name || currentCustomer?.fullName || t('assistantGuestLabel')
   const staffRoleLabel = staffPresence ? (t(ROLE_LABEL_KEY[staffPresence.role] || 'assistantRoleStaff')) : ''
 
+  // ===== نطاق غرفة المساعد لكل صيدلية (خصوصية — إصلاح جذري v2.2.0) =====
+  // كانت غرفة واحدة ثابتة لكل مستخدمي المنصة (زبائن وصيدليات وموظفون)
+  // فتتسرب محادثات الزبناء بين الصيدليات — الآن لكل صيدلية غرفتها:
+  //   - الزبون/الضيف: غرفة صيدلية المتجر التي اختارها.
+  //   - الموظف: غرفة صيدليته (ومالك المنصة: كل الغرف لاستقبال الإشعارات).
+  const myPharmacyIds = useMemo(() => {
+    if (currentUser) {
+      if (currentUser.role === 'super_admin') {
+        const ids = pharmaciesData.map(p => p.id).filter(Boolean)
+        if (activePharmacyId && activePharmacyId !== 'all' && ids.includes(activePharmacyId)) {
+          return [activePharmacyId, ...ids.filter(i => i !== activePharmacyId)]
+        }
+        return ids
+      }
+      return currentUser.pharmacyId ? [currentUser.pharmacyId] : []
+    }
+    return shopPharmacy ? [shopPharmacy] : []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentUser?.role, currentUser?.pharmacyId, pharmaciesData, activePharmacyId, shopPharmacy, open])
+  const myAssistantRooms = useMemo(() => myPharmacyIds.map(id => `${ASSISTANT_ROOM_PREFIX}${id}`), [myPharmacyIds])
+  // غرفة واجهة التحويل: آخر غرفة نشطة، وإلا صيدلية الجلسة/المتجر
+  const assistantRoom = lastAssistantRoom || myAssistantRooms[0] || null
+
   // رسالة الترحيب مشتقة (تتحدث فوراً عند تغيير اللغة أو الدور)
   const welcomeKey = audience === 'staff' ? 'assistantWelcomeStaff'
     : audience === 'customer' ? 'assistantWelcomeCustomer' : 'assistantWelcomeGuest'
   const welcomeText = t(welcomeKey).replace('{name}', displayName || '')
 
-  // ===== حضور الموظفين (البث) — «حسب المتوفر» =====
+  // ===== حضور الموظفين (البث المحلي نفس المتصفح) — «حسب المتوفر» =====
   const isStaffSide = audience === 'staff'
   useEffect(() => {
     if (!isStaffSide || !currentUser) return
     const announce = () => directLink.send({
       type: 'assistant_presence', presence: 'online',
-      who: currentUser.name, role: currentUser.role, ts: Date.now(),
+      who: currentUser.name, role: currentUser.role,
+      pharmacyId: currentUser.pharmacyId || null, ts: Date.now(),
     })
     announce()
     const iv = setInterval(announce, PRESENCE_INTERVAL)
@@ -109,11 +144,27 @@ const PHMPAssistant = () => {
     return () => { clearInterval(iv); leave(); window.removeEventListener('beforeunload', leave) }
   }, [isStaffSide, currentUser])
 
+  // ===== الانضمام لغرف المساعد المُحصورة (خادم فوري — عبر الأجهزة) =====
+  // الموظف ينضم لغرفة صيدليته (المالك: كل الغرف)؛ الزبون ينضم لغرفة صيدليته
+  // عند فتح اللوحة — فتصل رسائل التحويل والحضور عبر الأجهزة لا محلياً فقط.
+  useEffect(() => {
+    if (isStaffSide) {
+      myAssistantRooms.forEach((room) => realtime.joinRoom(room))
+    } else if (open && assistantRoom) {
+      realtime.joinRoom(assistantRoom)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStaffSide, open, myAssistantRooms.join('|'), assistantRoom])
+
   // الزبون يفتح اللوحة → يطلب حضوراً فورياً (لا ينتظر البث الدوري)
   // + يشغّل فحص جاهزية عامل النموذج مسبقاً (يمنع تعليق أول رسالة)
+  // + ينعش صيدلية المتجر المختارة (قد تكون تغيرت في صفحة المتجر)
   useEffect(() => {
     if (!open) return
-    if (!isStaffSide) directLink.send({ type: 'assistant_presence_probe', ts: Date.now() })
+    if (!isStaffSide) {
+      setShopPharmacy(readShopPharmacy())
+      directLink.send({ type: 'assistant_presence_probe', ts: Date.now() })
+    }
     probeWorker().catch(() => {})
   }, [open, isStaffSide])
 
@@ -122,7 +173,10 @@ const PHMPAssistant = () => {
   useEffect(() => {
     const off = directLink.onMessage((msg) => {
       if (msg.type === 'assistant_presence') {
-        if (msg.presence === 'online' && msg.who) {
+        // حضور محلي (نفس المتصفح): يُقبل فقط من صيدليتي (أو بلا صيدلية — مالك
+        // المنصة) كي لا يظهر موظف صيدلية أخرى «متصلاً» لزبون غير معنيّ بها
+        const scoped = !msg.pharmacyId || !myPharmacyIds.length || myPharmacyIds.includes(msg.pharmacyId)
+        if (msg.presence === 'online' && msg.who && scoped) {
           presenceRef.current = { name: msg.who, role: msg.role, ts: msg.ts }
           setStaffPresence(presenceRef.current)
         } else if (msg.presence === 'offline' && msg.who === presenceRef.current?.name) {
@@ -135,7 +189,8 @@ const PHMPAssistant = () => {
       if (msg.type === 'assistant_presence_probe' && isStaffSide && currentUser) {
         directLink.send({
           type: 'assistant_presence', presence: 'online',
-          who: currentUser.name, role: currentUser.role, ts: Date.now(),
+          who: currentUser.name, role: currentUser.role,
+          pharmacyId: currentUser.pharmacyId || null, ts: Date.now(),
         })
         return
       }
@@ -150,13 +205,51 @@ const PHMPAssistant = () => {
         }
         return
       }
-      // رسالة مباشرة أثناء التحويل واللوحة مغلقة → شارة
-      if (msg.type === 'chat' && msg.orderId === ASSISTANT_CHAT_ID && !open) {
+      // رسالة مباشرة (احتياط BroadcastChannel) أثناء التحويل واللوحة مغلقة → شارة
+      if (msg.type === 'chat' && msg.orderId && msg.orderId.startsWith(ASSISTANT_ROOM_PREFIX) && !open) {
         setUnread((u) => u + 1)
       }
     })
     return off
-  }, [isStaffSide, open, currentUser])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStaffSide, open, currentUser, myPharmacyIds.join('|')])
+
+  // ===== الاستماع عبر الخادم الفوري: حضور ورسائل غرف المساعد (عبر الأجهزة) =====
+  // حضور الغرفة (assistant:<ph>) من الخادم يصل الزبون على أي جهاز، ورسائل
+  // التحويل تحدّث الشارة وتحدد آخر غرفة نشطة (يفيد مالك المنصة متعدد الغرف).
+  useEffect(() => {
+    const roomsKey = myAssistantRooms.join('|')
+    const off = realtime.onMessage((msg) => {
+      if (!msg || !roomsKey) return
+      if (msg.type === 'presence' && msg.room && msg.room.startsWith(ASSISTANT_ROOM_PREFIX)) {
+        if (!myAssistantRooms.includes(msg.room)) return
+        if (isStaffSide) return // الموظفون يعتمدون بث الخادم للزبناء لا لأنفسهم
+        const first = (msg.staffOnline || [])[0]
+        if (msg.online && first) {
+          presenceRef.current = { name: first.name, role: first.role, ts: Date.now() }
+          setStaffPresence(presenceRef.current)
+        } else if (!msg.online) {
+          presenceRef.current = null
+          setStaffPresence(null)
+        }
+        return
+      }
+      if (msg.type === 'chat' && msg.room && msg.room.startsWith(ASSISTANT_ROOM_PREFIX)) {
+        if (!myAssistantRooms.includes(msg.room)) return
+        if (isStaffSide) {
+          setLastAssistantRoom(msg.room) // غرفة آخر رسالة (لمالك المنصة تحديداً)
+          if (!open || view !== 'escalate') {
+            setPendingChat(true)
+            if (!open) setUnread((u) => u + 1)
+          }
+        } else if (!open) {
+          setUnread((u) => u + 1)
+        }
+      }
+    })
+    return off
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStaffSide, open, view, myAssistantRooms.join('|')])
 
   // انتهاء صلاحية الحضور (TTL)
   useEffect(() => {
@@ -477,7 +570,7 @@ const PHMPAssistant = () => {
               </div>
               <div className="flex-1 min-h-0 p-3 overflow-y-auto">
                 <DirectChat
-                  orderId={ASSISTANT_CHAT_ID}
+                  room={assistantRoom}
                   who={displayName}
                   role={audience === 'staff' ? 'staff' : 'customer'}
                   counterpartLabel={isStaffSide ? t('assistantGuestLabel') : (staffRoleLabel || t('assistantRoleStaff'))}

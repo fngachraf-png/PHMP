@@ -21,13 +21,18 @@ const MAX_PAYLOAD = 32 * 1024        // 32 كيلوبايت كحد أقصى لل
 const MAX_TEXT = 2000                // طول نص الدردشة
 const RATE_LIMIT = 30                // رسالة كحد أقصى…
 const RATE_WINDOW = 10 * 1000        // …كل 10 ثوانٍ لكل اتصال
+const CALL_RATE_LIMIT = 30           // إشارة مكالمة كحد أقصى…
+const CALL_RATE_WINDOW = 60 * 1000   // …كل دقيقة لكل اتصال (حد خفيف بدل الإعفاء الكامل)
 const HEARTBEAT_MS = 30 * 1000
 
-export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
+// تطبيع رقم الهاتف للمطابقة بين بيانات الطلب وهوية الزبون المتصل
+const normalizePhone = (raw) => (typeof raw === 'string' ? raw.replace(/[\s-]/g, '') : '')
+
+export function setupRealtime(httpServer, { verifyJwt, originAllowed, log = () => {} } = {}) {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' })
 
   // سجل الاتصالات: connId -> conn meta
-  const conns = new Map()            // connId -> { ws, kind:'staff'|'customer', userId, pharmacyId, name, role, rooms:Set, lastSeen, rate:[timestamps] }
+  const conns = new Map()            // connId -> { ws, kind:'staff'|'customer', userId, pharmacyId, name, role, phone, rooms:Set, lastSeen, rate:[timestamps], callRate:[timestamps] }
   const byUser = new Map()           // userId -> Set<connId>  (موظفون)
   const byPharmacy = new Map()       // pharmacyId -> Set<connId>
   const rooms = new Map()            // roomName -> Set<connId>
@@ -75,6 +80,35 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
     })
   }
 
+  // ===== حضور غرف «المساعد» (assistant:<pharmacyId>) عبر الأجهزة =====
+  // عند انضمام موظف لغرفة مساعد صيدليته (أو انفصاله) يُعاد حساب الحضور
+  // ويُبثّ لأعضاء الغرفة — فترى واجهة الزبون «موظف متصل» على أي جهاز، وليس
+  // في نفس المتصفح فقط (كان الأمر محصوراً في احتياط BroadcastChannel). لا يُخزَّن شيء.
+  const assistantRoomPresence = (room) => {
+    if (!room || !room.startsWith('assistant:')) return
+    const staffOnline = []
+    eachConn(rooms.get(room) || [], (m) => {
+      if (m.kind === 'staff') staffOnline.push({ name: m.name, role: m.role })
+    })
+    eachConn(rooms.get(room) || [], (m) => {
+      sendTo(m.ws, { type: 'presence', room, online: staffOnline.length > 0, staffOnline })
+    })
+  }
+
+  // ===== صلاحية غرف المساعد (assistant:<pharmacyId>) =====
+  // محصورة بأعضاء الصيدلية المعنية: زبناؤها وموظفوها ومالك المنصة حصراً —
+  // لا انضمام ولا إرسال من صيدلية أخرى (منع التنصت/الانتحال عبر أسماء الغرف).
+  // غرف الطلبات (order:<id>) تعمل بآلية المراقبة الذاتية كما هي.
+  const canJoinAssistantRoom = (meta, room) => {
+    if (!room || !room.startsWith('assistant:')) return true
+    const phId = room.slice('assistant:'.length)
+    if (meta.kind === 'staff') {
+      return meta.role === 'super_admin' || !meta.pharmacyId || meta.pharmacyId === phId
+    }
+    if (meta.kind === 'customer') return !!phId && meta.pharmacyId === phId
+    return false
+  }
+
   const cleanupConn = (ws) => {
     const id = connIdOf(ws)
     if (!id) return
@@ -89,6 +123,8 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
         eachConn(rooms.get(room) || [], (m) => {
           sendTo(m.ws, { type: 'peer_left', room, who: meta.name })
         })
+        // غرف المساعد: إعادة حساب حضور الموظفين بعد رحيل هذا الطرف
+        assistantRoomPresence(room)
       }
       broadcastPresence(meta.pharmacyId)
     }
@@ -96,6 +132,16 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
   }
 
   wss.on('connection', (ws, req) => {
+    // ===== فحص أصل WebSocket (نفس قائمة CORS — راجع origins.js) =====
+    // المتصفح يرسل Origin إلزامياً؛ الأصل غير المدرج يُرفض فوراً بالإغلاق
+    // 4403 (سياسة الأصل) قبل أي مصادقة. الأصل الغائب مسموح: العملاء غير
+    // المتصفحين (اختبارات Node، تطبيق أندرويد عبر النفق) لا يرسلونه أصلاً.
+    const reqOrigin = req.headers.origin
+    if (originAllowed && reqOrigin && !originAllowed(reqOrigin)) {
+      log(`⛔ اتصال WS مرفوض (أصل غير مسموح): ${reqOrigin}`)
+      ws.close(4403, 'Origin غير مسموح')
+      return
+    }
     ws.__phmpConnId = `c${++connSeq}`
     conns.set(connIdOf(ws), { ws, kind: 'pending', rooms: new Set(), rate: [] })
     log(`🔌 اتصال جديد ${connIdOf(ws)} من ${req.socket.remoteAddress}`)
@@ -113,10 +159,18 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
       if (!meta) return
       if (raw.length > MAX_PAYLOAD) return ws.close(4002, 'حجم الرسالة كبير جداً')
 
-      // تحديد المعدل (لا ينطبق على الإشارة الحرجة للمكالمات)
+      // تحديد المعدل: إشارات المكالمات لها حد خفيف خاص (30/دقيقة لكل اتصال)
+      // بدل الإعفاء الكامل السابق — يمنع إغراق الترحيل دون كسر الإشارة الحرجة
       let msg
       try { msg = JSON.parse(raw.toString()) } catch { return }
-      if (msg.type !== 'call' && msg.type !== 'ping') {
+      if (msg.type === 'call') {
+        const now = Date.now()
+        meta.callRate = (meta.callRate || []).filter((ts) => now - ts < CALL_RATE_WINDOW)
+        if (meta.callRate.length >= CALL_RATE_LIMIT) {
+          return sendTo(ws, { type: 'error', message: 'معدل إشارات المكالمات مرتفع — تمهّل قليلاً' })
+        }
+        meta.callRate.push(now)
+      } else if (msg.type !== 'ping') {
         const now = Date.now()
         meta.rate = meta.rate.filter((ts) => now - ts < RATE_WINDOW)
         if (meta.rate.length >= RATE_LIMIT) return sendTo(ws, { type: 'error', message: 'معدل الرسائل مرتفع — تمهّل قليلاً' })
@@ -139,13 +193,15 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
           }
         } catch { /* رمز غير صالح — يُعامل كضيف */ }
         if (!identity && msg.guest && typeof msg.guest.name === 'string' && msg.guest.name.trim()) {
-          // زبون (مسجل أو عابر) — نطاقه صيدليته المختارة
+          // زبون (مسجل أو عابر) — نطاقه صيدليته المختارة؛ يُحفظ هاتفه في
+          // الذاكرة حصراً (لا قاعدة بيانات) لمطابقة بث طلبه الخاص إليه
           identity = {
             kind: 'customer',
             userId: null,
             name: msg.guest.name.trim().slice(0, 60),
             role: 'customer',
             pharmacyId: typeof msg.guest.pharmacyId === 'string' ? msg.guest.pharmacyId : null,
+            phone: typeof msg.guest.phone === 'string' ? msg.guest.phone.slice(0, 30) : '',
           }
         }
         if (!identity) return ws.close(4003, 'مصادقة غير صالحة')
@@ -189,8 +245,14 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
           ts: Date.now(),
         }
         if (room) {
+          // غرف المساعد محصورة بصيدلية الطرف (خصوصية): مرفوض من خارجها
+          if (!canJoinAssistantRoom(meta, room)) {
+            return sendTo(ws, { type: 'error', message: 'هذه الغرفة تخص صيدلية أخرى' })
+          }
           // انضمام تلقائي للغرفة عند أول مشاركة
           if (!meta.rooms.has(room)) { meta.rooms.add(room); addToGroup(rooms, room, id) }
+          // غرف المساعد: بث الحضور المحدث لأعضاء الغرفة
+          if (room.startsWith('assistant:')) assistantRoomPresence(room)
           // تسليم لكل أعضاء الغرفة ما عدا المرسل (زبون + موظفو الصيدلية)
           const members = new Set(rooms.get(room) || [])
           members.delete(id)
@@ -228,8 +290,14 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
       // ===== انضمام غرفة (دردشة طلب — دون إرسال رسالة) =====
       if (msg.type === 'join' && typeof msg.room === 'string') {
         const room = msg.room.slice(0, 80)
+        // غرف المساعد محصورة بصيدلية الطرف: لا انضمام من صيدلية أخرى
+        if (!canJoinAssistantRoom(meta, room)) {
+          return sendTo(ws, { type: 'error', message: 'لا يمكنك الانضمام لغرفة مساعد صيدلية أخرى' })
+        }
         if (!meta.rooms.has(room)) { meta.rooms.add(room); addToGroup(rooms, room, id) }
         sendTo(ws, { type: 'joined', room, members: [...(rooms.get(room) || [])].length })
+        // انضمام موظف لغرفة مساعد: بث حضوره للزبناء المنتظرين عبر الأجهزة
+        if (room.startsWith('assistant:')) assistantRoomPresence(room)
         return
       }
 
@@ -246,8 +314,13 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
           if (typeof msg.room === 'string') addRoomMembers(msg.room)
           if (phId) eachConn(byPharmacy.get(phId) || [], (m, mid) => { if (mid !== id && m.kind === 'staff') targets.add(mid) })
         } else {
-          // طلب جديد: كل المتصلين بصيدلية الطلب (موظفوها)
-          if (phId) eachConn(byPharmacy.get(phId) || [], (m, mid) => { if (mid !== id) targets.add(mid) })
+          // طلب جديد: موظفو صيدلية الطلب حصراً — لا زبناء آخرين (منع تسرب
+          // بيانات زبناء آخرين؛ صاحب الطلب يستقبل عبر آلية المطابقة أدناه)
+          if (phId) eachConn(byPharmacy.get(phId) || [], (m, mid) => { if (mid !== id && m.kind === 'staff') targets.add(mid) })
+          // مالك المنصة (سوبر أدمين بلا صيدلية): يستقبل بث الطلبات الجديدة
+          for (const [cid, m] of conns) {
+            if (m.kind === 'staff' && m.role === 'super_admin' && cid !== id) targets.add(cid)
+          }
         }
         eachConn(targets, (m) => sendTo(m.ws, envelope))
         return
@@ -284,8 +357,9 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
         const targets = new Set()
         const to = typeof msg.to === 'string' ? msg.to : null
         if (to === `pharmacy:${meta.pharmacyId}`) {
-          // زبون يتصل بالصيدلية: كل الموظفين المتصلين بها
-          eachConn(byPharmacy.get(meta.pharmacyId) || [], (m, mid) => { if (mid !== id) targets.add(mid) })
+          // زبون يتصل بالصيدلية: الموظفون المتصلون بها حصراً — لا زبناء
+          // آخرين (كان يرنّ لكل زبناء الصيدلية — تشويش وتسرب حضور)
+          eachConn(byPharmacy.get(meta.pharmacyId) || [], (m, mid) => { if (mid !== id && m.kind === 'staff') targets.add(mid) })
         } else if (to?.startsWith('user:')) {
           for (const cid of byUser.get(to.slice(5)) || []) targets.add(cid)
         } else if (to?.startsWith('client:')) {
@@ -316,16 +390,38 @@ export function setupRealtime(httpServer, { verifyJwt, log = () => {} } = {}) {
   })
 
   // ===== بث من الخادم مباشرة (وليس ترحيل عميل) =====
-  // يُستعمل بعد حفظ الطلب في SQLite: يصل فورياً لكل موظفي صيدلية الطلب
-  // المتصلين + أعضاء غرفة الطلب (الزبون المراقب) — مهما كانت واجهتهم
-  // (Pages/Vercel/أندرويد) لأن الجميع متصل بنفس الخادم الفوري الموحد.
+  // يُستعمل بعد حفظ الطلب في SQLite: يصل فورياً لموظفي صيدلية الطلب
+  // المتصلين + مالك المنصة (سوبر أدمين) + صاحب الطلب نفسه (مطابقة الهاتف
+  // أو عضوية غرفة الطلب) — مهما كانت واجهتهم (Pages/Vercel/أندرويد) لأن
+  // الجميع متصل بنفس الخادم الفوري الموحد.
+  // خصوصية: الزبناء الآخرون لا يستقبلون طلبات غيرهم إطلاقاً (كانوا يستقبلونها).
   const broadcastOrder = (order, action = 'new') => {
     if (!order || typeof order !== 'object' || !order.id) return
+    const roomName = `order:${String(order.id).slice(0, 80)}`
     const targets = new Set()
+    // موظفو صيدلية الطلب حصراً (لا زبناء آخرين — منع تسرب بيانات الزبناء)
     if (order.pharmacyId) {
-      eachConn(byPharmacy.get(order.pharmacyId) || [], (_m, mid) => targets.add(mid))
+      eachConn(byPharmacy.get(order.pharmacyId) || [], (m, mid) => {
+        if (m.kind === 'staff') targets.add(mid)
+      })
     }
-    for (const cid of rooms.get(`order:${String(order.id).slice(0, 80)}`) || []) targets.add(cid)
+    // مالك المنصة (سوبر أدمين بلا صيدلية): يستقبل بث الطلبات أيضاً
+    for (const [cid, m] of conns) {
+      if (m.kind === 'staff' && m.role === 'super_admin') targets.add(cid)
+    }
+    // صاحب الطلب نفسه: الزبون المتصل الذي يطابق هاتفه هاتف الطلب —
+    // يُضاف إلى غرفة الطلب كي تصله كل التحديثات اللاحقة عبر المراقبة
+    const ownerPhone = normalizePhone(order.customer?.phone)
+    if (ownerPhone) {
+      for (const [cid, m] of conns) {
+        if (m.kind === 'customer' && normalizePhone(m.phone) === ownerPhone) {
+          if (m.rooms && !m.rooms.has(roomName)) { m.rooms.add(roomName); addToGroup(rooms, roomName, cid) }
+          targets.add(cid)
+        }
+      }
+    }
+    // أعضاء غرفة الطلب (الزبون المراقب عبر watch-orders + الموظفون)
+    for (const cid of rooms.get(roomName) || []) targets.add(cid)
     const envelope = {
       type: 'order', action: action === 'update' ? 'update' : 'new',
       order, from: 'server', fromKind: 'server', ts: Date.now(),
