@@ -28,7 +28,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           npx --yes wrangler@3 deploy 2>&1 | tee deploy.log
-          URL=$(grep -o 'https://phmp-realtime[^.]*\.workers\.dev' deploy.log | head -1 || true)
+          # العنوان يحمل حساباً فرعياً: phmp-realtime.<account>.workers.dev —
+          # كان النمط [^.]* يتوقف عند أول نقطة فيُفشل التحقق رغم نجاح النشر
+          URL=$(grep -o 'https://phmp-realtime[^ ]*\.workers\.dev' deploy.log | head -1 || true)
           echo "realtime_url=${URL}" >> $GITHUB_ENV
           if [ -n "$URL" ]; then
             echo "✅ العنوان العام: $URL"
