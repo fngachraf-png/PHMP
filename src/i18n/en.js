@@ -660,4 +660,8 @@ export const en = {
   stockImportNewItems: 'New items',
   stockImportRestocked: 'Restocked items',
   itemsCountLabel: 'items',
+  // ===== v2.4.0 fixes =====
+  exportDone: 'Export completed',
+  accessDenied: 'Access denied',
+  accessDeniedHint: 'You do not have the required permissions to access this page. Contact the platform owner or pharmacy manager.',
 }

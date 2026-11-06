@@ -37,6 +37,9 @@ const DirectChat = ({
   const [connMode, setConnMode] = useState('offline') // server | local | offline
   const [locating, setLocating] = useState(false)
   const listRef = useRef(null)
+  // منع التكرار: الرسالة قد تصل عبر قناتين (بث محلي فوري + ترحيل الخادم عند
+  // عودة الاتصال) — معرّف العميل (cid) يزيل النسخة المكررة لدى المستقبل
+  const seenCids = useRef(new Set())
   // اسم الغرفة: صريح (غرف المساعد المُحصورة بصيدلية) أو مشتق من الطلب/الزميل
   const roomName = room || (orderId ? `order:${orderId}` : (peer ? `dm:${peer.id}` : null))
   const callTarget = peer
@@ -52,6 +55,11 @@ const DirectChat = ({
     const off = realtime.onMessage((msg) => {
       if (!msg) return
       if (msg.type === 'chat') {
+        // منع التكرار عبر القناتين (cid) — قبل أي معالجة أخرى
+        if (msg.cid) {
+          if (seenCids.current.has(msg.cid)) return
+          seenCids.current.add(msg.cid)
+        }
         // رسالة عبر الخادم: تخص الغرفة أو موجهة إليّ مباشرة
         const viaServer = msg.via === 'server'
         const mineRoom = msg.room === roomName
@@ -106,12 +114,14 @@ const DirectChat = ({
     e?.preventDefault()
     const trimmed = text.trim()
     if (!trimmed) return
-    realtime.sendChat({
+    const res = realtime.sendChat({
       room: roomName || undefined,
       to: peer ? `user:${peer.id}` : undefined,
       text: trimmed,
       displayName: who, // اسم العرض (يُعتمد للضيوف — الموظفون باسم جلستهم)
     })
+    // صودر معرّف الرسالة كي لا يتكرر صدى لوصولها عبر قناة أخرى
+    if (res?.cid) seenCids.current.add(res.cid)
     setMessages((prev) => [...prev, { from: who, role, text: trimmed, ts: Date.now(), mine: true }])
     setText('')
   }

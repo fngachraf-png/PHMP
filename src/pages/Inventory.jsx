@@ -252,7 +252,7 @@ const Inventory = () => {
           >
             <option value="all">{t('all')} {t('category')}</option>
             {categories.map(c => (
-              <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+              <option key={c.id} value={c.id}>{c.icon} {pickName(c)}</option>
             ))}
           </select>
 
@@ -592,7 +592,7 @@ const Inventory = () => {
                     className="input"
                   >
                     {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                      <option key={c.id} value={c.id}>{c.icon} {pickName(c)}</option>
                     ))}
                   </select>
                 </div>

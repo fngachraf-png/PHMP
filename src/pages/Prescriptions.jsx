@@ -312,7 +312,7 @@ const Prescriptions = () => {
                   >
                     <option value="">{language === 'ar' ? 'اختر دواء' : language === 'fr' ? 'Choisir un médicament' : 'Select med'}</option>
                     {productsData.filter(p => p.requiresPrescription).map(p => (
-                      <option key={p.id} value={p.id}>{isRTL ? p.name : p.nameEn}</option>
+                      <option key={p.id} value={p.id}>{pickName(p)}</option>
                     ))}
                   </select>
                   <input

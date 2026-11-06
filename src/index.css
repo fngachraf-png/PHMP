@@ -237,6 +237,12 @@
     .dark .bg-violet-50 { background-color: rgba(139, 92, 246, 0.15); }
     .dark .bg-violet-100 { background-color: rgba(139, 92, 246, 0.22); }
     .dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.22); }
+    /* شارات الحالة في الطلبات: جاهز (سماوي) وقيد التوصيل (نيلي) — كانت
+       تبقى شريحتين فاتحتين ساطعتين وسط الواجهة القاتمة (خلل التباين المُبلَّغ) */
+    .dark .bg-cyan-100 { background-color: rgba(34, 211, 238, 0.16); }
+    .dark .text-cyan-700 { color: #67e8f9; }
+    .dark .bg-indigo-100 { background-color: rgba(99, 102, 241, 0.18); }
+    .dark .text-indigo-700 { color: #a5b4fc; }
 
     /* ===== نصوص ملونة (تباين عالٍ على الأسطح الداكنة) ===== */
     .dark .text-primary-600 { color: #34d399; }

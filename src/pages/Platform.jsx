@@ -431,7 +431,9 @@ const Platform = () => {
 
   const roleLabel = (role) => {
     const info = ROLE_INFO[role]
-    return info ? (language === 'ar' ? info.ar : info.en) : role
+    if (!info) return role
+    // بالفرنسية التسمية الفرنسية أولى (كانت تظهر بالإنجليزية — خلل ترجمة)
+    return language === 'ar' ? info.ar : language === 'fr' ? (info.fr || info.en) : info.en
   }
 
   // مصفوفة الصلاحيات — مشتقة مباشرة من PERMISSIONS (مصدر الحقيقة الوحيد)

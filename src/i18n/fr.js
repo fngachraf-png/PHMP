@@ -660,4 +660,8 @@ export const fr = {
   stockImportNewItems: 'Nouveaux articles',
   stockImportRestocked: 'Articles réapprovisionnés',
   itemsCountLabel: 'articles',
+  // ===== Corrections v2.4.0 =====
+  exportDone: 'Export terminé',
+  accessDenied: 'Accès non autorisé',
+  accessDeniedHint: 'Vous n\'avez pas les autorisations nécessaires pour accéder à cette page. Contactez le propriétaire de la plateforme ou le directeur de la pharmacie.',
 }

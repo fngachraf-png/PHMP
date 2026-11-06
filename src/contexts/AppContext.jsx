@@ -430,7 +430,17 @@ export const AppProvider = ({ children }) => {
 
     syncNow()
     const off = realtime.onStatus((s) => { if (s === 'online') syncNow() })
-    return () => { cancelled = true; off() }
+    // عودة التطبيق للواجهة أو عودة الشبكة: جلب فوري لتعويض فترة التجمد
+    // (أندرويد يجمّد الـWebView خلفياً — كان المستخدم يعيد التشغيل ليرى الجديد)
+    const onWake = () => { if (document.visibilityState === 'visible') syncNow() }
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('online', onWake)
+    return () => {
+      cancelled = true
+      off()
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('online', onWake)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, currentCustomer?.phone])
 
@@ -489,6 +499,22 @@ export const AppProvider = ({ children }) => {
     const iv = setInterval(() => { if (orderSyncQueue.size() > 0) flushOrderQueue() }, 60000)
     return () => { off(); clearInterval(iv) }
   }, [flushOrderQueue])
+
+  // إشعارات عامة من وحدات غير-React (مثل حفظ ملف التصدير داخل تطبيق أندرويد)
+  useEffect(() => {
+    const onToast = (e) => {
+      if (!e?.detail) return
+      setNotifications((prev) => [{
+        id: Date.now(),
+        title: t('exportDone'),
+        message: String(e.detail).slice(0, 140),
+        time: new Date(),
+      }, ...prev].slice(0, 20))
+    }
+    window.addEventListener('phmp:toast', onToast)
+    return () => window.removeEventListener('phmp:toast', onToast)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // الترجمة مع سلسلة احتياطية (اللغة → العربية → المفتاح)
   const t = (key) => translations[language]?.[key] || translations.ar?.[key] || key

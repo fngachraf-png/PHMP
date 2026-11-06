@@ -635,7 +635,10 @@ export class RealtimeHub {
         : att.name
       const envelope = {
         type: 'chat', room, from: displayName, fromKind: att.kind, fromRole: att.role,
-        fromId: att.userId || att.connId, connId: att.connId, text: body, ts: Date.now(),
+        fromId: att.userId || att.connId, connId: att.connId, text: body,
+        // معرّف رسالة العميل (cid) — يُرحَّل كما هو لمنع التكرار لدى المستقبِل
+        cid: typeof msg.cid === 'string' ? msg.cid.slice(0, 48) : undefined,
+        ts: Date.now(),
       }
       if (room) {
         if (!this.canJoinAssistantRoom(att, room)) {

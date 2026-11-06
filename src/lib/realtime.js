@@ -18,6 +18,14 @@ const RECONNECT_BASE = 1000
 const RECONNECT_MAX = 20000
 const PING_EVERY = 25000
 const LIVE_RETRY_AFTER = 3 * 60 * 1000 // بعد فشل الطبقة السحابية: تجربتها مجدداً بعد 3 دقائق
+// كشف الوصلة الميتة (نصف مفتوحة): بعد 75 ثانية دون أي ورد من الخادم
+// (نبضتان بفاصل 30ث + هامش) نُغلق القناة قسرياً ونعيد الاتصال — كانت
+// الوصلة الحية شكلاً تبقى «متصلة» بلا استقبال فلا تصل الطلبات ولا الرسائل
+// ولا المكالمات حتى إعادة تشغيل التطبيق (خلل الجلسة المعلقة المُبلَّغ عنه).
+const DEAD_SILENCE_MS = 75000
+// عودة للتطبيق/الشبكة: إن صمت الخادم منذ 40ث نعيد الاتصال فوراً بدل انتظار المهلة
+const RESUME_SILENCE_MS = 40000
+const PENDING_CHATS_MAX = 40
 
 class RealtimeClient {
   constructor() {
@@ -32,6 +40,14 @@ class RealtimeClient {
     this.manualClose = false
     this.queue = []                 // رسائل بانتظار اكتمال الاتصال
     this.roomNames = new Set()      // الغرف الملتحق بها
+    this.lastServerActivity = 0     // آخر ورد من الخادم (كشف الوصلة الميتة)
+    this.pendingChats = []          // دردشة أُرسلت أثناء الانقطاع — تُرحَّل عند العودة
+    this.resumeBound = false
+  }
+
+  // معرّف رسالة عميل (لمنع التكرار عند الوصول عبر قناتين: فورية + مؤجلة)
+  newCid() {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
   }
 
   // ===== الاشتراك في الأحداث (chat / call / presence / order / welcome…) =====
@@ -72,6 +88,7 @@ class RealtimeClient {
   // المقبس موثقاً بالهوية القديمة (خلل جذري v2.2.0).
   connect(auth) {
     if (typeof window === 'undefined') return
+    this.ensureResumeHandlers()
     const sameIdentity = (a, b) => {
       if (!a || !b) return false
       // موظفون: نفس المستخدم حصراً (كان أي رمزين يُعتبران نفس الهوية —
@@ -87,6 +104,9 @@ class RealtimeClient {
     }
     this.auth = auth
     // هوية مختلفة على مقبس قائم: تفكيك نظيف ثم اتصال جديد بالمصادقة الجديدة
+    // (إصلاح v2.2.0 — لا يُحذف: تبديل الحساب دون تفكيك يُبقي المقبس موثقاً
+    // بالهوية القديمة إلى الأبد). رسائل الدردشة المنتظرة مرتبطة بالهوية
+    // القديمة فتُمسح معه.
     if (live) this.teardownSocket()
     this.manualClose = false
     this.attempt = 0
@@ -115,6 +135,39 @@ class RealtimeClient {
       old.onerror = null
       try { old.close() } catch { /* تجاهل */ }
     }
+  }
+
+  // ===== الاستجابة لعودة التطبيق للواجهة أو عودة الشبكة =====
+  // إخفاء التطبيق (أندرويد/iOS أو تبويب خلفي) يجمّد المؤقتات ويقطع TCP
+  // بصمت — عند العودة نفحص صمت الخادم: وصلة ميتة ← إعادة اتصال فورية،
+  // وصلة حية ← لا شيء. كما نستدعي open() مباشرة إن كنا غير متصلين أصلاً
+  // (كان المستخدم يعيد تشغيل التطبيق ليحصل على ما فاته — الآن تلقائي).
+  ensureResumeHandlers() {
+    if (this.resumeBound || typeof document === 'undefined') return
+    this.resumeBound = true
+    const onResume = () => {
+      if (this.manualClose || !this.auth) return
+      if (this.status === 'online' && this.ws) {
+        const silentFor = Date.now() - (this.lastServerActivity || 0)
+        if (silentFor > RESUME_SILENCE_MS) {
+          // وصلة مشكوك فيها: تفكيك نظيف وفتح فوري (بلا تراجع أسي)
+          this.teardownSocket()
+          this.attempt = 0
+          this.open()
+        }
+        return
+      }
+      if (this.status === 'idle' || (!this.ws && !this.reconnectTimer)) {
+        this.manualClose = false
+        this.attempt = 0
+        this.open()
+      }
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') onResume()
+    })
+    window.addEventListener('online', onResume)
+    window.addEventListener('focus', onResume)
   }
 
   open() {
@@ -154,6 +207,8 @@ class RealtimeClient {
     }
 
     ws.onmessage = (event) => {
+      // أي ورد من الخادم دليل حياة (رسائل/نبض/pong) — يُحدّث عدّاد الصمت
+      this.lastServerActivity = Date.now()
       let msg
       try { msg = JSON.parse(event.data) } catch { return }
       if (msg.type === 'welcome') {
@@ -164,9 +219,10 @@ class RealtimeClient {
         // إعادة الانضمام للغرف والمراقبة بعد انقطاع
         this.roomNames.forEach((room) => this.send({ type: 'join', room }))
         if (this.watchIds?.length) this.send({ type: 'watch-orders', ids: this.watchIds })
-        // تصريف الرسائل المنتظرة
+        // تصريف الرسائل المنتظرة ثم دردشة الانقطاع (بترتيب الإرسال)
         const q = this.queue.splice(0)
         q.forEach((m) => this.send(m))
+        this.flushPendingChats()
         this.emit({ ...msg, via: 'server' })
         this.keepAlive()
         return
@@ -216,6 +272,17 @@ class RealtimeClient {
   keepAlive() {
     clearInterval(this.pingTimer)
     this.pingTimer = setInterval(() => {
+      // نبض دوري مع كشف الوصلة الميتة: صمت أطول من DEAD_SILENCE_MS رغم
+      // readyState «مفتوحة» يعني أن القناة نصف مفتوحة (تبديل شبكة/سبات
+      // الجهاز) — تُفكّك قسرياً وتُعاد فوراً بدل البقاء «متصلًا» بلا استقبال.
+      const silentFor = Date.now() - (this.lastServerActivity || 0)
+      if (silentFor > DEAD_SILENCE_MS) {
+        this.teardownSocket()
+        this.setStatus('offline')
+        this.attempt = 0
+        this.open()
+        return
+      }
       this.send({ type: 'ping' })
     }, PING_EVERY)
   }
@@ -247,14 +314,28 @@ class RealtimeClient {
   // ===== الدردشة =====
   // room: غرفة طلب (زبون ↔ موظفي الصيدلية) | to: user:<id> أو client:<id> مباشرة
   // displayName: اسم الطرف الحالي (يُعتمد للضيوف؛ الموظفون دوماً باسم جلستهم الموثقة)
-  sendChat({ room, to, text, displayName }) {
+  // كل رسالة تُختم بمعرّف عميل (cid) لمنع تكرارها عند وصولها عبر قناتين.
+  // سقوط الاتصال لا يضيع الرسالة بعد اليوم: تُحفظ في طابور ذاكرة مؤقت
+  // (بلا أي تخزين دائم — قاعدة المالك) وتُرحَّل تلقائياً عند عودة الاتصال؛
+  // كما تُبثّ محلياً (نفس المتصفح) كي لا تتأخر الواجهة الحالية.
+  sendChat({ room, to, text, displayName, cid }) {
     if (room) this.roomNames.add(room)
-    const ok = this.sendOrQueue({ type: 'chat', room, to, text, displayName })
-    if (ok) return 'server'
-    // احتياط: بث محلي (نفس المتصفح) — يُرسل اسم الغرفة كما هو؛ المستقبِل
-    // (DirectChat) يقبل المعرّف الخام وصيغة الغرفة معاً (order:/dm:)
+    const msgId = cid || this.newCid()
+    const payload = { type: 'chat', room, to, text, displayName, cid: msgId }
+    if (this.sendOrQueue(payload)) return { via: 'server', cid: msgId }
+    // الانقطاع: طابور مؤقت للترحيل عند العودة + بث محلي فوري (نفس المتصفح)
+    if (this.status === 'offline' || this.status === 'idle') {
+      if (this.pendingChats.length < PENDING_CHATS_MAX) this.pendingChats.push(payload)
+    }
     directLink.sendChat(room || `dm:${to}`, displayName || this.identity?.name || 'PHMP', this.identity?.role || 'user', text)
-    return 'local'
+    return { via: 'local', cid: msgId }
+  }
+
+  // ترحيل دردشة الانقطاع عند العودة (welcome) — بنفس الترتيب ومع cid الأصلي
+  flushPendingChats() {
+    if (!this.pendingChats.length) return
+    const batch = this.pendingChats.splice(0, PENDING_CHATS_MAX)
+    batch.forEach((m) => this.send(m))
   }
 
   joinRoom(room) {

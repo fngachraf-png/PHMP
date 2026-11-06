@@ -242,6 +242,9 @@ export function setupRealtime(httpServer, { verifyJwt, originAllowed, log = () =
           fromId: meta.userId || id,
           connId: id,
           text,
+          // معرّف رسالة العميل: يُرحَّل كما هو ليتحتفظ بمعرّفه عند الوصول عبر
+          // أكثر من قناة (فورية + مؤجلة) — المستقبِل يزيل النسخة المكررة
+          cid: typeof msg.cid === 'string' ? msg.cid.slice(0, 48) : undefined,
           ts: Date.now(),
         }
         if (room) {

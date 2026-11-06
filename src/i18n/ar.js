@@ -660,4 +660,8 @@ export const ar = {
   stockImportNewItems: 'أصناف جديدة',
   stockImportRestocked: 'أصناف مُزوَّدة',
   itemsCountLabel: 'صنف',
+  // ===== إصلاحات v2.4.0 =====
+  exportDone: 'تم التصدير',
+  accessDenied: 'غير مصرح لك بالوصول',
+  accessDeniedHint: 'ليست لديك الصلاحيات اللازمة للوصول إلى هذه الصفحة. تواصل مع مالك المنصة أو مدير الصيدلية.',
 }
