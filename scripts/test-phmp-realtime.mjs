@@ -138,6 +138,41 @@ async function main() {
   const dm = await staff2.waitFor((m) => m.type === 'chat' && m.to === 'user:u-staff2')
   ok('DM موظف→موظف عبر معرف المستخدم', dm.text.includes('1001') && dm.fromId === 'u-staff1')
 
+  // ===== 8ب. DM بغرف غير متناظرة + توجيه مباشر (إصلاح v2.4.1) =====
+  // الخلل الجذري للتراسل الداخلي: كل طرف كان يشتق غرفة dm:<الطرف الآخر>
+  // (متناظرة عكسياً) والخادم يتجاهل `to` عند وجود `room` — فلا تصل الرسالة
+  // أبداً. الآن: الغرفة + `to` معاً يجب أن تصل للمستهدف في الاتجاهين.
+  staff.send({ type: 'join', room: 'dm:legacy-u-staff2' })   // غرفة الطرف الأول (أسلوب العميل)
+  staff2.send({ type: 'join', room: 'dm:legacy-u-staff1' })  // غرفة الطرف الثاني
+  await sleep(300)
+  staff.send({ type: 'chat', room: 'dm:legacy-u-staff2', to: 'user:u-staff2', text: 'داخلية ١' })
+  const dmRoomTo = await staff2.waitFor((m) => m.type === 'chat' && m.text === 'داخلية ١')
+  ok('DM بغرفة المرسل + to: تصل للمستهدف (إصلاح تجاهل to مع room)', !!dmRoomTo && dmRoomTo.fromId === 'u-staff1')
+  staff2.send({ type: 'chat', room: 'dm:legacy-u-staff1', to: 'user:u-staff1', text: 'داخلية ٢' })
+  const dmRoomTo2 = await staff.waitFor((m) => m.type === 'chat' && m.text === 'داخلية ٢')
+  ok('DM بالاتجاه المعاكس: تصل أيضاً', !!dmRoomTo2)
+  // عضو الغرفة وهو نفسه المستهدف: نسخة واحدة حصراً (لا تكرار)
+  const dmDup = staff.msgs.filter((m) => m.type === 'chat' && m.text === 'داخلية ٢').length
+  ok('لا تكرار عند اجتماع العضوية والتوجيه المباشر', dmDup === 1)
+
+  // ===== 8ج. غرفة DM كانونية متناظرة (نمط العميل الجديد v2.4.1) =====
+  // الطرفان يشتركان في الغرفة نفسها المشتقة من زوج المعرفين مرتباً —
+  // التراسل يعمل بلا حاجة إلى `to` أصلاً.
+  const canonRoom = 'dm:' + ['u-staff1', 'u-staff2'].sort().join(':')
+  staff.send({ type: 'join', room: canonRoom })
+  staff2.send({ type: 'join', room: canonRoom })
+  await sleep(300)
+  staff.send({ type: 'chat', room: canonRoom, text: 'كانونية ١' })
+  const canonGot = await staff2.waitFor((m) => m.type === 'chat' && m.room === canonRoom && m.text === 'كانونية ١')
+  ok('غرفة DM كانونية: الاتجاه الأول', !!canonGot)
+  staff2.send({ type: 'chat', room: canonRoom, text: 'كانونية ٢' })
+  const canonGot2 = await staff.waitFor((m) => m.type === 'chat' && m.room === canonRoom && m.text === 'كانونية ٢')
+  ok('غرفة DM كانونية: الاتجاه المعاكس', !!canonGot2)
+  // حقل to يُرحَّل في مظروف الغرفة كي يعرف العميل أن الرسالة موجهة إليه
+  staff.send({ type: 'chat', room: canonRoom, to: 'user:u-staff2', text: 'كانونية مع to' })
+  const canonTo = await staff2.waitFor((m) => m.type === 'chat' && m.text === 'كانونية مع to')
+  ok('مظروف الغرفة يحمل to المُرحَّل', canonTo.to === 'user:u-staff2')
+
   // ===== 9. خصوصية غرف المساعد: زبون صيدلية أخرى مرفوض =====
   const guest2 = await openWs({ auth: { guest: { name: 'زبون صيدلية 2', phone: '+212600000002', pharmacyId: 'ph2' } } })
   guest2.send({ type: 'chat', room: 'assistant:ph1', text: 'تجسس؟' })

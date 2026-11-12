@@ -26,6 +26,7 @@ const DirectChat = ({
   counterpartLabel,        // تسمية الطرف الآخر للعرض
   compact = false,
   peer,                    // { kind:'user', id, name, avatar? } — دردشة موظف↔موظف
+  selfId,                  // معرّف الموظف الحالي (لبناء غرفة DM كانونية متناظرة)
   pharmacyId,              // صيدلية الطلب (لتوجيه مكالمة الزبون لموظفيها)
   enableCalls = true,      // أزرار المكالمات
   room,                    // اسم غرفة صريح يتجاوز البناء التلقائي (مساعد PHMP)
@@ -40,8 +41,26 @@ const DirectChat = ({
   // منع التكرار: الرسالة قد تصل عبر قناتين (بث محلي فوري + ترحيل الخادم عند
   // عودة الاتصال) — معرّف العميل (cid) يزيل النسخة المكررة لدى المستقبل
   const seenCids = useRef(new Set())
-  // اسم الغرفة: صريح (غرف المساعد المُحصورة بصيدلية) أو مشتق من الطلب/الزميل
-  const roomName = room || (orderId ? `order:${orderId}` : (peer ? `dm:${peer.id}` : null))
+  // سقف ذاكرة منع التكرار (منع نموّ لا نهائي في الجلسات الطويلة)
+  const rememberCid = (cid) => {
+    if (!cid) return
+    if (seenCids.current.size >= 600) {
+      const first = seenCids.current.values().next().value
+      seenCids.current.delete(first)
+    }
+    seenCids.current.add(cid)
+  }
+  // اسم الغرفة: صريح (غرف المساعد المُحصورة بصيدلية) أو مشتق من الطلب/الزميل.
+  // غرفة التراسل المباشر موظف↔موظف تُبنى **كانونياً** من زوج المعرفين مرتباً
+  // (v2.4.1): كانت تُشتق من معرّف الطرف الآخر فقط فيصبح كل طرف في غرفة
+  // مختلفة (`dm:<الطرف الآخر>`) فلا تصل رسالة موظف لموظف إطلاقاً عبر
+  // الخادم ولا عبر الاحتياط المحلي — الخلل الجذري للتراسل الداخلي.
+  const dmRoom = peer
+    ? (selfId && peer.id
+        ? `dm:${[String(selfId), String(peer.id)].sort().join(':')}`
+        : `dm:${peer.id}`)
+    : null
+  const roomName = room || (orderId ? `order:${orderId}` : dmRoom)
   const callTarget = peer
     ? `user:${peer.id}`
     : (role === 'customer' || role === 'guest')
@@ -52,28 +71,47 @@ const DirectChat = ({
   useEffect(() => {
     if (!roomName) return
     realtime.joinRoom(roomName)
+    // الغرفة «مفتوحة أمام المستخدم»: رسائلها لا تحتاج إشعاراً منفصلاً
+    realtime.setChatActive(roomName, true)
+    // ترطيب الجلسة: الرسائل التي وصلت والمكوّن مغلق (تنقّل/تبديل طلب/إغلاق
+    // لوحة) كانت تضيع للأبد — الآن تُستعاد من دفتر الجلسة (ذاكرة حصراً)
+    const journal = realtime.getChatLog(roomName)
+    if (journal.length) {
+      setMessages((prev) => {
+        if (prev.length) return prev // مركّب حديثاً بلا رسائل — الترطيب عند أول فتح حصراً
+        return journal.map((m) => ({
+          from: m.from, role: m.fromRole || m.fromKind,
+          text: m.text, ts: m.ts, mine: !!m.mine,
+        }))
+      })
+      journal.forEach((m) => { if (m.cid) rememberCid(m.cid) })
+    }
     const off = realtime.onMessage((msg) => {
       if (!msg) return
       if (msg.type === 'chat') {
         // منع التكرار عبر القناتين (cid) — قبل أي معالجة أخرى
         if (msg.cid) {
           if (seenCids.current.has(msg.cid)) return
-          seenCids.current.add(msg.cid)
+          rememberCid(msg.cid)
         }
         // رسالة عبر الخادم: تخص الغرفة أو موجهة إليّ مباشرة
         const viaServer = msg.via === 'server'
         const mineRoom = msg.room === roomName
-        const mineDirect = !msg.room && peer && msg.fromId === peer.id
+        const mineDirect = (!msg.room && peer && msg.fromId === peer.id) ||
+          // تحويل خادمي صريح إليّ (شبكة أمان التوجيه المباشر — v2.4.1)
+          (selfId && msg.to === `user:${selfId}` && peer && msg.fromId === peer.id)
         if (viaServer && !mineRoom && !mineDirect) return
         // احتياط BroadcastChannel (نفس المتصفح): يقبل المعرّف الخام وصيغة
         // الغرفة معاً — كان يُقارن order:<id> بمعرّف خام فتُهمَل الرسالة أبداً
         if (!viaServer) {
-          const raw = msg.orderId
+          const raw = msg.orderId || msg.room
           const mine = raw === orderId || raw === roomName ||
             (orderId && raw === `order:${orderId}`) ||
-            (peer && (raw === `dm:${peer.id}` || raw === `user:${peer.id}`))
+            (peer && (raw === `dm:${peer.id}` || raw === `user:${peer.id}` || raw === dmRoom))
           if (raw && !mine) return
         }
+        // رسالتي المرتدة عبر قناة احتياطية: لا تُضاف ولا نغمة (المرسل أضافها محلياً)
+        if (msg.mine) return
         setMessages((prev) => [...prev, {
           from: msg.from, role: msg.role || msg.fromRole,
           text: msg.text, ts: msg.ts || Date.now(), mine: false,
@@ -88,8 +126,11 @@ const DirectChat = ({
         setPeerOnline(false)
       }
     })
-    return off
-  }, [roomName, orderId, peer, pharmacyId])
+    return () => {
+      off()
+      realtime.setChatActive(roomName, false)
+    }
+  }, [roomName, orderId, peer, pharmacyId, selfId, dmRoom])
 
   // حالة الاتصال (خادم فوري ↔ محلي فقط)
   useEffect(() => {
@@ -121,7 +162,7 @@ const DirectChat = ({
       displayName: who, // اسم العرض (يُعتمد للضيوف — الموظفون باسم جلستهم)
     })
     // صودر معرّف الرسالة كي لا يتكرر صدى لوصولها عبر قناة أخرى
-    if (res?.cid) seenCids.current.add(res.cid)
+    if (res?.cid) rememberCid(res.cid)
     setMessages((prev) => [...prev, { from: who, role, text: trimmed, ts: Date.now(), mine: true }])
     setText('')
   }

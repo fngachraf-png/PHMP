@@ -185,6 +185,7 @@ const StaffComms = () => {
                     role={currentUser.role}
                     counterpartLabel={activePeer.name}
                     peer={{ kind: 'user', id: activePeer.id, name: activePeer.name, avatar: activePeer.avatar }}
+                    selfId={currentUser.id}
                     compact
                   />
                 </div>

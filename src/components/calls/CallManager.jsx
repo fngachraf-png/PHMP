@@ -178,8 +178,16 @@ const CallManager = () => {
           realtime.sendCall({ action: 'reject', callId: msg.callId, to: msg.fromConn, reason: 'busy' })
           return
         }
+        // وجهة الردود (قبول/ICE/إنهاء): للموظفين نوجّه بمعرّف المستخدم المستقر
+        // `user:<id>` — كان التوجيه بمعرّف الاتصال الفاني حصراً، فإذا انقطع
+        // مقبس أي طرف وأُعيد الاتصال أثناء المكالمة (كشف الوصلة الميتة) صار
+        // المعرّف قديماً فتضيع القبول/المرشحات وتنقطع المكالمة صامتةً.
+        // للزبناء لا معرّف مستقر — يبقى معرّف الاتصال كما هو.
+        const replyTo = (msg.fromKind === 'staff' && msg.fromId)
+          ? `user:${msg.fromId}`
+          : (msg.fromConn || msg.fromId)
         setCallState({
-          phase: 'incoming', callId: msg.callId, replyTo: msg.fromConn,
+          phase: 'incoming', callId: msg.callId, replyTo,
           peerName: msg.from, peerRole: msg.fromRole, media: msg.media,
           offerSdp: msg.sdp, pc: null, localStream: null, timer: null,
         })

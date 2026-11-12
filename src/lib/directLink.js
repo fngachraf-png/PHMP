@@ -82,9 +82,10 @@ export const directLink = {
     }
   },
 
-  // رسائل الدردشة المباشرة
-  sendChat(orderId, from, role, text) {
-    this.send({ type: 'chat', orderId, from, role, text })
+  // رسائل الدردشة المباشرة — cid يُرحَّل كي يزيل التكرار لدى المستقبل
+  // عند وصولها عبر القناتين (بث محلي + ترحيل الخادم عند عودة الاتصال)
+  sendChat(orderId, from, role, text, cid) {
+    this.send({ type: 'chat', orderId, from, role, text, ...(cid ? { cid } : {}) })
   },
 
   // إشعار حضور (متصل/غير متصل) — يسمح بمعرفة "حسب المتوفر"

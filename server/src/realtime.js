@@ -256,10 +256,24 @@ export function setupRealtime(httpServer, { verifyJwt, originAllowed, log = () =
           if (!meta.rooms.has(room)) { meta.rooms.add(room); addToGroup(rooms, room, id) }
           // غرف المساعد: بث الحضور المحدث لأعضاء الغرفة
           if (room.startsWith('assistant:')) assistantRoomPresence(room)
-          // تسليم لكل أعضاء الغرفة ما عدا المرسل (زبون + موظفو الصيدلية)
-          const members = new Set(rooms.get(room) || [])
-          members.delete(id)
-          eachConn(members, (m) => sendTo(m.ws, envelope))
+          // التوجيه المباشر يُكرّم حتى مع الغرفة (v2.4.1 — تكافؤ البروتوكول مع
+          // الطبقة السحابية): كان حقل `to` يُهمَل كلياً عند وجود غرفة — وفي
+          // التراسل المباشر موظف↔موظف كان كل طرف يشتق اسم غرفة مختلفاً
+          // فلا تصل الرسالة أبداً. الآن: أعضاء الغرفة + المستهدف صراحةً.
+          envelope.to = msg.to || undefined
+          const targets = new Set(rooms.get(room) || [])
+          targets.delete(id)
+          if (typeof msg.to === 'string' && msg.to) {
+            if (msg.to.startsWith('user:')) {
+              for (const cid of byUser.get(msg.to.slice(5)) || []) targets.add(cid)
+            } else if (msg.to.startsWith('client:')) {
+              if (conns.has(msg.to.slice(7))) targets.add(msg.to.slice(7))
+            } else if (conns.has(msg.to)) {
+              targets.add(msg.to)
+            }
+            targets.delete(id) // المرسل لا يستقبل رسالته
+          }
+          eachConn(targets, (m) => sendTo(m.ws, envelope))
           // إذا كان المرسل زبوناً ولم يكن أحد من الموظفين في الغرفة بعد:
           // وجّهها أيضاً لكل موظفي الصيدلية المتصلين (كي تصل دون فتح غرفة مسبقاً)
           if (meta.kind === 'customer' && meta.pharmacyId) {
@@ -267,7 +281,7 @@ export function setupRealtime(httpServer, { verifyJwt, originAllowed, log = () =
             eachConn(byPharmacy.get(meta.pharmacyId) || [], (m, mid) => {
               if (mid !== id && m.kind === 'staff') staffConns.add(mid)
             })
-            members.forEach((mid) => staffConns.delete(mid))
+            targets.forEach((mid) => staffConns.delete(mid))
             eachConn(staffConns, (m, mid) => {
               sendTo(m.ws, envelope)
               if (!m.rooms.has(room)) { m.rooms.add(room); addToGroup(rooms, room, mid) }

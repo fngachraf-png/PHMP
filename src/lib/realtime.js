@@ -26,6 +26,13 @@ const DEAD_SILENCE_MS = 75000
 // عودة للتطبيق/الشبكة: إن صمت الخادم منذ 40ث نعيد الاتصال فوراً بدل انتظار المهلة
 const RESUME_SILENCE_MS = 40000
 const PENDING_CHATS_MAX = 40
+// دفتر جلسة الرسائل (v2.4.1 — إصلاح خلل «الرسائل تضيع ما لم تكن الدردشة مفتوحة»):
+// ذاكرة حصراً (قاعدة المالك 8 — لا تخزين دائم بأي شكل) تحفظ رسائل الجلسة
+// لكل غرفة كي يستعيدها DirectChat عند فتحه بعدما وصلت الرسالة وهو مغلق
+// — كان المستقبل لا يراها أبداً وكانت الواجهة الوحيدة السامعة هي
+// الدردشة المفتوحة نفسها.
+const CHAT_LOG_ROOMS_MAX = 24     // أقصى عدد غرف محفوظة في الذاكرة
+const CHAT_LOG_PER_ROOM = 60      // أقصى رسائل لكل غرفة
 
 class RealtimeClient {
   constructor() {
@@ -43,6 +50,92 @@ class RealtimeClient {
     this.lastServerActivity = 0     // آخر ورد من الخادم (كشف الوصلة الميتة)
     this.pendingChats = []          // دردشة أُرسلت أثناء الانقطاع — تُرحَّل عند العودة
     this.resumeBound = false
+    this.chatLog = new Map()        // مفتاح محادثة -> مصفوفة رسائل الجلسة (ذاكرة حصراً)
+    this.activeChats = new Set()    // الغرف المفتوحة أمام المستخدم الآن (كبت الإشعارات)
+  }
+
+  // ===== مفتاح محادثة كانوني للذاكرة =====
+  // غرف الطلبات/المساعد: المعرّف نفسه. التراسل المباشر (to: user:<id>):
+  // زوج المعرفين مرتب إملائياً كي يحفظ الطرفان الرسالة تحت المفتاح نفسه
+  // — كان كل طرف يشتق مفتاحاً مختلفاً فلا يجد طرف رسائل الآخر (خلل DM).
+  chatKey({ room, to }) {
+    if (room && !room.startsWith('dm:')) return room
+    const myId = this.identity?.userId
+    if (to && typeof to === 'string' && to.startsWith('user:') && myId) {
+      return `dm:${[to.slice(5), myId].sort().join(':')}`
+    }
+    return room || (to ? `dm:${to}` : null)
+  }
+
+  // ===== تسجيل رسالة في دفتر الجلسة (ذاكرة حصراً) =====
+  logChat(entry) {
+    const key = this.chatKey(entry)
+    if (!key) return
+    // منع التكرار عند وصول الرسالة عبر قناتين (فورية + مؤجلة)
+    if (entry.cid) {
+      const list = this.chatLog.get(key)
+      if (list && list.some((m) => m.cid === entry.cid)) return
+    }
+    if (!this.chatLog.has(key)) {
+      this.chatLog.set(key, [])
+      // تقليم أقدم الغرف عند تجاوز السقف (ذاكرة محدودة عن قصد)
+      if (this.chatLog.size > CHAT_LOG_ROOMS_MAX) {
+        const oldest = this.chatLog.keys().next().value
+        if (oldest !== key) this.chatLog.delete(oldest)
+      }
+    }
+    const list = this.chatLog.get(key)
+    list.push({ ...entry, key })
+    if (list.length > CHAT_LOG_PER_ROOM) list.splice(0, list.length - CHAT_LOG_PER_ROOM)
+  }
+
+  // استرجاع رسائل الجلسة لغرفة (لترطيب DirectChat عند الفتح)
+  getChatLog(room) {
+    return room && this.chatLog.has(room) ? this.chatLog.get(room).slice() : []
+  }
+
+  // تسجيل/إلغاء غرفة «مفتوحة أمام المستخدم» (DirectChat مركّب) —
+  // رسائل الغرفة المفتوحة تعرضها الواجهة نفسها فلا تحتاج إشعاراً منفصلاً
+  setChatActive(room, on) {
+    if (!room) return
+    if (on) this.activeChats.add(room)
+    else this.activeChats.delete(room)
+  }
+
+  // ===== مسار موحّد لكل رسالة واردة (خادم أو بث محلي) =====
+  // يُسجّل الدردشة في دفتر الجلسة دائماً (حتى بلا واجهة سامعة — هذا هو
+  // جوهر الإصلاح)، ثم يُصدر إشعار chat_notice للغرف غير المفتوحة كي
+  // تعرف الواجهة (نغمة + شارة) أن رسالة جديدة وصلت، ثم يبث للجميع.
+  emit(payload) {
+    if (payload && payload.type === 'chat') {
+      const entry = {
+        room: payload.room || null,
+        to: payload.to || null,
+        from: payload.from,
+        fromKind: payload.fromKind || payload.role || null,
+        fromRole: payload.fromRole || null,
+        fromId: payload.fromId || null,
+        text: payload.text,
+        ts: payload.ts || Date.now(),
+        cid: payload.cid || null,
+        mine: !!payload.mine,
+      }
+      this.logChat(entry)
+      // إشعار الرسائل الجديدة: للغرف غير المفتوحة حصراً وبحسب الطرف:
+      //  - الموظفون: رسالة زبون (غرفة طلب/مساعد) أو تراسل مباشر موجّه إليّ.
+      //  - الزبون: ردّ الموظفين على أي من طلبه وهو خارج شاشة التتبع —
+      //    كان يكتشف الردّ فقط إن بقي مفتوحاً على الطلب (جزء من الشكوى).
+      const key = this.chatKey(entry)
+      const addressedToMe = entry.to && this.identity?.userId && entry.to === `user:${this.identity.userId}`
+      const roomish = key && (key.startsWith('order:') || key.startsWith('assistant:'))
+      const isCustomerSide = this.identity?.kind === 'customer'
+      const staffRelevant = entry.fromKind === 'customer' || addressedToMe
+      if (!entry.mine && !this.activeChats.has(key) &&
+          (isCustomerSide ? roomish : staffRelevant)) {
+        this.listeners.forEach((cb) => { try { cb({ type: 'chat_notice', chat: entry, via: payload.via }) } catch { /* مستمع معطل */ } })
+      }
+    }
+    this.listeners.forEach((cb) => { try { cb(payload) } catch { /* مستمع معطل */ } })
   }
 
   // معرّف رسالة عميل (لمنع التكرار عند الوصول عبر قناتين: فورية + مؤجلة)
@@ -53,9 +146,12 @@ class RealtimeClient {
   // ===== الاشتراك في الأحداث (chat / call / presence / order / welcome…) =====
   onMessage(cb) {
     this.listeners.add(cb)
-    // الوضع الاحتياطي: استقبال أحداث BroadcastChannel كذلك (نفس المتصفح)
+    // الوضع الاحتياطي: استقبال أحداث BroadcastChannel كذلك (نفس المتصفح).
+    // يمر عبر المسار الموحّد emit كي تُسجّل دردشات الاحتياط في دفتر الجلسة
+    // وتُصدر إشعاراتها أيضاً (كانت تتجاوز كل هذا كلياً).
     const off = directLink.onMessage((msg) => {
-      if (this.status !== 'online') cb({ ...msg, via: 'local' })
+      if (this.status !== 'online' && msg && msg.type === 'chat') this.emit({ ...msg, room: msg.orderId || msg.room || null, via: 'local' })
+      else if (this.status !== 'online' && msg) cb({ ...msg, via: 'local' })
     })
     return () => {
       this.listeners.delete(cb)
@@ -67,10 +163,6 @@ class RealtimeClient {
     this.statusListeners.add(cb)
     cb(this.status)
     return () => this.statusListeners.delete(cb)
-  }
-
-  emit(payload) {
-    this.listeners.forEach((cb) => { try { cb(payload) } catch { /* مستمع معطل */ } })
   }
 
   setStatus(s) {
@@ -234,6 +326,8 @@ class RealtimeClient {
       }
       this.emit({ ...msg, via: 'server' })
     }
+    // ملاحظة emit: رسائل الدردشة الخادمية تمر عبر المسار الموحّد أعلاه
+    // (تسجيل بالدفتر + إشعار chat_notice + بث) — v2.4.1
 
     ws.onclose = (event) => {
       clearTimeout(failTimer)
@@ -322,12 +416,24 @@ class RealtimeClient {
     if (room) this.roomNames.add(room)
     const msgId = cid || this.newCid()
     const payload = { type: 'chat', room, to, text, displayName, cid: msgId }
+    // رسالة المرسل تُسجّل في دفتر جلسته فوراً (mine:true) — كانت تُحفظ في
+    // state المكوّن فقط فتضيع عند التنقل/إغلاق اللوحة وتختفي «المحادثة»
+    // عند العودة إليها (جزء من شكوى عدم المزامنة).
+    // تسجيل مباشر بلا بث: واجهة المرسل تضيف الرسالة محلياً بنفسها، والبث
+    // الذاتي كان سيعرضها مرتين وبصفة «واردة».
+    this.logChat({
+      room: room || null, to: to || null,
+      from: displayName || this.identity?.name || 'PHMP',
+      fromKind: this.identity?.kind || 'user', fromRole: this.identity?.role || null,
+      fromId: this.identity?.userId || null,
+      text, ts: Date.now(), cid: msgId, mine: true,
+    })
     if (this.sendOrQueue(payload)) return { via: 'server', cid: msgId }
     // الانقطاع: طابور مؤقت للترحيل عند العودة + بث محلي فوري (نفس المتصفح)
     if (this.status === 'offline' || this.status === 'idle') {
       if (this.pendingChats.length < PENDING_CHATS_MAX) this.pendingChats.push(payload)
     }
-    directLink.sendChat(room || `dm:${to}`, displayName || this.identity?.name || 'PHMP', this.identity?.role || 'user', text)
+    directLink.sendChat(room || `dm:${to}`, displayName || this.identity?.name || 'PHMP', this.identity?.role || 'user', text, msgId)
     return { via: 'local', cid: msgId }
   }
 

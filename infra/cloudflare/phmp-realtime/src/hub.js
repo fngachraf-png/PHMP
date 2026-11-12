@@ -646,13 +646,29 @@ export class RealtimeHub {
         }
         this.joinRoom(ws, att, room)
         if (room.startsWith('assistant:')) this.assistantRoomPresence(room)
-        const members = this.socketsInRoom(room, att.connId)
-        members.forEach(({ ws: mws }) => this.sendTo(mws, envelope))
+        // التوجيه المباشر يُكرّم حتى مع الغرفة (v2.4.1): كان حقل `to` يُهمَل
+        // كلياً عندما تُرسل الرسالة بغرفة — وفي الدردشة المباشرة موظف↔موظف
+        // كان كل طرف يشتق اسم غرفة مختلفاً فلا تصل الرسالة أبداً. الآن:
+        // أعضاء الغرفة + المستهدف صراحةً (بلا تكرار لنفس المقبس).
+        envelope.to = msg.to || undefined
+        const targets = new Map()
+        this.socketsInRoom(room, att.connId).forEach(({ ws: mws, att: matt }) => targets.set(matt.connId, mws))
+        if (typeof msg.to === 'string' && msg.to) {
+          if (msg.to.startsWith('user:')) {
+            this.socketsOfUser(msg.to.slice(5)).forEach(({ ws: tws, att: tatt }) => targets.set(tatt.connId, tws))
+          } else {
+            const rawId = msg.to.startsWith('client:') ? msg.to.slice(7) : msg.to
+            const t = this.socketByConn(rawId)
+            if (t) targets.set(rawId, t.ws)
+          }
+          targets.delete(att.connId) // المرسل لا يستقبل رسالته
+        }
+        targets.forEach((tws) => this.sendTo(tws, envelope))
         // زبون بلا موظفين في الغرفة بعد: وجّهها لكل موظفي صيدليته المتصلين
         if (att.kind === 'customer' && att.pharmacyId) {
           const inRoom = new Set(this.socketsInRoom(room, att.connId).map(({ att: a }) => a.connId))
           this.pharmacyStaff(att.pharmacyId, att.connId).forEach(({ ws: mws, att: matt }) => {
-            if (!inRoom.has(matt.connId)) {
+            if (!inRoom.has(matt.connId) && !targets.has(matt.connId)) {
               this.sendTo(mws, envelope)
               this.joinRoom(mws, matt, room)
             }

@@ -317,6 +317,27 @@ export const AppProvider = ({ children }) => {
         return
       }
 
+      // ===== إشعار رسالة جديدة خارج الدردشة المفتوحة (v2.4.1) =====
+      // الطبقة الفورية تُصدر chat_notice للرسائل التي وصلت والغرفة غير مفتوحة
+      // أمام المستخدم — كان الموظف لا يعرف أبداً أن الزبون راسله ما لم يفتح
+      // الطلب نفسه، وكان الزبون لا يعلم بردّ الموظف ما لم يبقَ في شاشة التتبع.
+      // الرسالة نفسها محفوظة في دفتر الجلسة وستظهر عند فتح الدردشة.
+      if (msg.type === 'chat_notice' && msg.chat) {
+        const c = msg.chat
+        sounds.message()
+        if (currentUser) {
+          const title = language === 'ar' ? 'رسالة جديدة'
+            : language === 'fr' ? 'Nouveau message' : 'New message'
+          setNotifications((prev) => [{
+            id: `chat-${c.cid || c.ts || Date.now()}`,
+            title,
+            message: `${(c.from || '').slice(0, 40)}: ${(c.text || '').slice(0, 60)}`,
+            time: new Date(),
+          }, ...prev].slice(0, 20))
+        }
+        return
+      }
+
       // طلب جديد/تحديث حالة (من خادم فوري أو احتياط BroadcastChannel)
       if (msg.type === 'order' && msg.order) {
         const incoming = msg.order
